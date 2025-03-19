@@ -17,3 +17,8 @@ Implementar um ciclo contínuo no qual a LLM gere inicialmente os critérios de 
 
 • Abordagem Híbrida:
 Combinar os pontos fortes dos métodos tradicionais de APR com as capacidades de síntese e edição de código dos LLMs. Isso pode incluir, por exemplo, a extração de “ingredientes” de patches a partir de múltiplas soluções geradas pela LLM, possibilitando a criação de correções mais robustas e complexas.
+
+# Organização de pastas
+
+- Formatted code: o código do sistema no formato enviado para a LLM; aquivos de compilação, configuração de IDE, e arquivos vazios, por exemplo, foram ignorados.
+- gemini: organizar logs de conversas para testes e geração de código.

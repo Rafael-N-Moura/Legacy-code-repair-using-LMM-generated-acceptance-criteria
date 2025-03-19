@@ -1,0 +1,756 @@
+user_message: Analyze the code below, including its purpose, inputs, and expected outputs. Then, generate a detailed natural language description of all the necessary scenarios that verify whether the code functions correctly and meets its intended requirements. Consider that the code will be transformed for the Java 17 language.
+
+File 1:
+<phokUi.java>
+import java.awt.*;
+import javax.swing.*;
+import java.awt.event.*;
+import javax.swing.event.*;
+import java.sql.*;
+import java.io.*;
+
+public class PhokUi {
+	static JList artists,albums,tracks;
+	static TextField dir;
+	static Button scan;
+	static String msg;
+	static Connection conn;	
+	static String driver;
+	static String url;
+	static String db;
+	static String user;
+	static String pass;
+	static JScrollPane artistPanel;
+	static JScrollPane albumPanel;
+	static JScrollPane trackPanel;
+	static ResultSet rs;
+	static DefaultListModel artistModel, albumModel, trackModel;
+	static JFrame window;
+	static JLabel status;
+	static Statement populate, popAlbum, popTrack;
+
+	public static void main(String[] args) throws SQLException{
+		try {
+			driver = new String();
+			driver = "com.mysql.jdbc.Driver";
+			url = new String();
+			url = "jdbc:mysql://localhost/";
+			db = new String();
+			db = "music";
+			user = new String();
+			user = "phoku";
+			pass = new String();
+			pass = "phoku";
+			JPanel contentPane = new JPanel();
+			contentPane.setLayout(new FlowLayout());
+			Label title = new Label("*************************************** PhokU Media Library Lister ***************************************",Label.CENTER);
+			contentPane.add(title);
+			dir = new TextField(150);
+			dir.setText("Browse Directory to list");
+			contentPane.add(dir);
+			scan = new Button("Scan");
+			contentPane.add(scan);
+			artistModel = new DefaultListModel();
+			albumModel = new DefaultListModel();
+			trackModel = new DefaultListModel();
+			artists = new JList(artistModel);
+			albums = new JList(albumModel);
+			tracks = new JList(trackModel);
+
+			/* add items dynamically */
+		
+			artistPanel = new JScrollPane(artists);
+			albumPanel = new JScrollPane(albums);
+			trackPanel = new JScrollPane(tracks);
+			artists.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+			albums.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+			tracks.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+			window = new JFrame("PhokU Media Library Manager");
+			artistPanel.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+			artistPanel.setPreferredSize(new Dimension(250, 250));
+			albumPanel.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+			albumPanel.setPreferredSize(new Dimension(250, 250));
+			trackPanel.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+			trackPanel.setPreferredSize(new Dimension(250, 250));
+			contentPane.add(artistPanel);
+			contentPane.add(albumPanel);
+			contentPane.add(trackPanel);
+			status = new JLabel("Idle");
+			contentPane.add(status);
+			window.getContentPane().add(contentPane);
+			Class.forName(driver).newInstance();
+			conn = DriverManager.getConnection(url+db, user, pass);
+			System.out.println("Connection formed");
+			populate = conn.createStatement();
+			popAlbum = conn.createStatement();
+			popTrack = conn.createStatement();
+			scan.addActionListener(new ActionListener() {
+				public void actionPerformed(ActionEvent ae) {
+					System.out.println("Scanning directory...");
+					status.setText("Scanning directory....");
+					try {
+					FileOps oFileOps = new FileOps(dir.getText());
+					rs = populate.executeQuery("select distinct(artist) from main");
+					while (rs.next()) {
+						artistModel.addElement(rs.getString("artist"));
+					}
+					status.setText("Scan complete.");
+					} catch (SQLException e) {System.out.println("SQLException occured in PhokUi");}
+				}
+			});
+			artists.addListSelectionListener(new ListSelectionListener() {
+				public void valueChanged(ListSelectionEvent lse) {
+					try {
+					rs = popAlbum.executeQuery("select distinct(album) from main where artist = '" + artistModel.getElementAt(artists.getSelectedIndex()).toString() + "'");
+					trackModel.clear();
+					albumModel.clear();
+					while (rs.next()) {
+						albumModel.addElement(rs.getString("album"));
+					}
+					} catch (SQLException e) { }
+				}
+			});
+			albums.addListSelectionListener(new ListSelectionListener() {
+				public void valueChanged(ListSelectionEvent lse) {
+					try {
+					rs = popTrack.executeQuery("select track from main where album = '" + albumModel.getElementAt(albums.getSelectedIndex()).toString() + "'");
+					trackModel.clear();
+					while (rs.next()) {
+						trackModel.addElement(rs.getString("track"));
+					}
+					} catch (SQLException e) { }
+				}
+			});
+		}
+		catch (SQLException e) {System.out.println("SQLException caught in PhokUi"); }
+		catch (ClassNotFoundException e) {System.out.println("Class not found"); }
+		catch (Exception e) {System.out.println("Exception Occured in PhokUi"); }
+		window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		window.pack();
+		window.show();
+	}
+}
+</phokUi.java>
+
+File 2:
+<FileOps.java>
+import java.io.*;
+import org.blinkenlights.jid3.*;
+import org.blinkenlights.jid3.v1.*;
+import org.blinkenlights.jid3.v2.*;
+import java.sql.*;
+
+/*************************************************************************************************************************
+ * The file operations class. Scans the user selected directory recursively for media of MP3 type, retrieves the ID3 Tags
+ * and enters the values into the database. 
+ * @author: Saahil
+ * *************************************************************************************************************************/
+
+class FileOps {
+	static Connection conn = null;
+
+	//The constructor. Clears the database, everytime a new parent directory is selected. 
+	FileOps(String path) throws SQLException {
+		String driver = "com.mysql.jdbc.Driver";
+		String url = "jdbc:mysql://localhost/";
+		String db = "music";
+		String user = "phoku";
+		String pass = "phoku";
+
+		try {
+			Class.forName(driver).newInstance();
+			conn = DriverManager.getConnection(url+db, user, pass);
+			Statement stmt = conn.createStatement();
+			stmt.executeUpdate("delete from main");
+			conn.close();
+			getTrackList(path);
+		}
+		catch (Exception e) {}
+	}
+
+
+	// Scans the directory for MP3 files
+	static void getTrackList(String dirPath) throws ID3Exception, IOException, SQLException{
+		MediaFile iMediaFile;
+		String track = new String();
+		String album = new String();
+		String artist = new String();
+		try {
+			File dir = new File(dirPath);
+			if (dir.isDirectory()) {
+				String[] flList = dir.list();
+				int len = flList.length;
+
+				for (int i = 0; i < len; i++) {
+					File f = new File(dirPath + "/" + flList[i]);
+					String fileName = dirPath + "/" + flList[i];
+					if (!f.isDirectory()) {
+						if (fileName.endsWith("mp3")){
+							iMediaFile = new MP3File(f);
+							ID3Tag[] oTags = iMediaFile.getTags();
+							if (oTags[0] instanceof ID3V1_0Tag) {
+								ID3V1_0Tag oActTag = (ID3V1_0Tag)oTags[0];
+								track = oActTag.getTitle();
+								album = oActTag.getAlbum();
+								artist = oActTag.getArtist();
+								insertIntoDb(fileName, track, album, artist);
+							}
+							else if (oTags[0] instanceof ID3V1_1Tag) {
+								ID3V1_1Tag oActTag = (ID3V1_1Tag)oTags[0];
+								track = oActTag.getTitle();
+								album = oActTag.getAlbum();
+								artist = oActTag.getArtist();
+								insertIntoDb(fileName, track, album, artist);
+							}
+						}
+					}
+					// Recursive call if current File object points to a directory
+					else
+						getTrackList(fileName);
+				}
+			}
+			else 
+				throw new FileNotFoundException();
+			
+			}
+		catch (IOException e) {
+			System.out.println("Path doesn't exist or is not a directory");
+		}
+		catch(ID3Exception e) {System.out.println("Other");}
+	}
+	
+	//Populates the database 
+	static void insertIntoDb(String fileName, String track, String album, String artist) throws SQLException  {
+		String url = "jdbc:mysql://localhost/";
+		String dbName = "music";
+		String user = "phoku";
+		String pass = "phoku";
+		String driver = "com.mysql.jdbc.Driver";
+		try {
+			Class.forName(driver);
+			conn = DriverManager.getConnection(url+dbName, user, pass);
+			Statement stmt = conn.createStatement();
+			stmt.executeUpdate("Insert into main values ('" + fileName + "', '" + track + "', '" + album + "', '" + artist + "')");
+			conn.close();
+		}
+		catch(ClassNotFoundException e) {}
+		catch(SQLException e) {}
+		catch(Exception e) {}
+	}
+	
+}
+
+</FileOps.java>
+
+assistant_reasoning: The user wants an analysis of two Java files, PhokUi.java and FileOps.java.
+The analysis should include:
+
+Purpose: What does each file do? What is the overall application trying to achieve?
+
+Inputs: What inputs does each file/the application take?
+
+Expected Outputs: What are the expected outputs of the application?
+
+Scenarios for Verification: Detailed natural language descriptions of test scenarios to verify the code's correctness and requirements. These scenarios should consider the transformation to Java 17.
+
+Let's analyze each file first.
+
+File 1: PhokUi.java
+
+Purpose: This file seems to be the user interface (UI) for a media library lister application named "PhokU Media Library Lister". It provides a graphical interface to scan a directory, list artists, albums, and tracks from MP3 files found in that directory. The data is likely stored in a MySQL database named "music".
+
+Inputs:
+
+User input: Directory path to scan (via a TextField).
+
+User interaction: Clicking the "Scan" button.
+
+User interaction: Selecting artists, albums from JLists.
+
+MySQL database credentials (hardcoded): driver, URL, database name, username, password.
+
+Expected Outputs:
+
+GUI window displaying:
+
+Title: "PhokU Media Library Manager"
+
+Text field to enter directory path.
+
+"Scan" button.
+
+Three JLists: "artists", "albums", "tracks".
+
+Status label to show "Idle" or "Scanning directory...." and "Scan complete."
+
+When "Scan" is clicked:
+
+The application should scan the directory specified in the text field.
+
+It should populate the "artists" JList with distinct artists found in the scanned MP3 files (data fetched from the "music" database, table "main").
+
+When an artist is selected:
+
+The "albums" JList should be populated with distinct albums by the selected artist (data fetched from the "music" database, table "main").
+
+When an album is selected:
+
+The "tracks" JList should be populated with tracks from the selected album (data fetched from the "music" database, table "main").
+
+Database interaction:
+
+Connects to a MySQL database named "music".
+
+Executes SQL queries to fetch artist, album, and track data.
+
+File 2: FileOps.java
+
+Purpose: This file handles file system operations, specifically scanning a directory for MP3 files, extracting ID3 tags (version 1.0 and 1.1), and inserting the extracted data into a MySQL database. It seems to be responsible for populating the "music" database.
+
+Inputs:
+
+Directory path to scan (passed to the constructor and getTrackList method).
+
+MP3 files within the scanned directory and its subdirectories.
+
+Expected Outputs:
+
+Database updates: Inserts rows into the "main" table of the "music" database with file path, track title, album, and artist information extracted from MP3 ID3 tags.
+
+Database clearing: When a new directory is scanned, the "main" table is cleared before populating it again.
+
+Error messages to the console in case of IOExceptions, ID3Exceptions, SQLExceptions, ClassNotFoundException.
+
+No direct GUI output.
+
+Overall Application Purpose:
+The "PhokU Media Library Lister" application allows users to scan a directory for MP3 music files, extract metadata (artist, album, track) from their ID3 tags, store this metadata in a MySQL database, and then browse the music library through a GUI, filtering by artist and album.
+
+Transformation to Java 17:
+The code uses older Swing components and JDBC. For Java 17, we might want to consider modernizing parts of it, but for the purpose of verification scenarios, we should focus on the functional behavior irrespective of the Java version. Java 17 compatibility is mostly about language features and library updates, and the core logic should remain the same. We should note if any deprecated features are used that might be flagged in Java 17. com.mysql.jdbc.Driver is deprecated and should be replaced with com.mysql.cj.jdbc.Driver.
+
+Verification Scenarios:
+
+We need to cover different scenarios to ensure the application works correctly. These scenarios should test:
+
+GUI Functionality: UI elements are displayed correctly and respond to user interactions.
+
+Directory Scanning: Correctly scans directories and subdirectories.
+
+MP3 File Processing: Correctly identifies and processes MP3 files.
+
+ID3 Tag Extraction: Extracts artist, album, and track information from ID3v1.0 and ID3v1.1 tags.
+
+Database Operations:
+
+Database connection (successful and failure).
+
+Clearing the "main" table before each scan.
+
+Inserting data into the "main" table correctly.
+
+Querying data from the "main" table to populate lists.
+
+Error Handling: Handles cases like:
+
+Invalid directory path.
+
+Directory with no MP3 files.
+
+MP3 files without ID3 tags or with incomplete tags.
+
+Database connection errors.
+
+SQL query errors.
+
+Let's structure the scenarios in a more organized way. We'll categorize them based on the functionalities.
+
+assistant_answer: Code Analysis: PhokUi.java and FileOps.java
+Purpose:
+
+The application "PhokU Media Library Lister" aims to provide a simple graphical user interface to browse a music library stored in a MySQL database. It allows users to:
+
+Scan a directory: Recursively scan a user-specified directory for MP3 files.
+
+Extract metadata: Read ID3 tags (v1.0 and v1.1) from the found MP3 files, extracting track title, album, and artist information.
+
+Store metadata in a database: Populate a MySQL database named "music" with the extracted metadata. The database likely has a table named "main" to store this information.
+
+Browse the library: Display artists, albums, and tracks in a hierarchical list format. Selecting an artist displays their albums, and selecting an album displays its tracks.
+
+File 1: PhokUi.java
+
+Purpose: This file implements the graphical user interface (GUI) of the "PhokU Media Library Lister". It handles user interaction, displays lists of artists, albums, and tracks, and triggers the directory scanning process. It also interacts with the MySQL database to retrieve and display data.
+
+Inputs:
+
+User Input (GUI):
+
+Directory path entered in the TextField (dir).
+
+Clicking the "Scan" button.
+
+Selecting an artist from the artists JList.
+
+Selecting an album from the albums JList.
+
+Database Configuration (Hardcoded):
+
+MySQL JDBC driver class name (com.mysql.jdbc.Driver).
+
+Database URL (jdbc:mysql://localhost/).
+
+Database name (music).
+
+Username (phoku).
+
+Password (phoku).
+
+Expected Outputs:
+
+GUI Window: A window titled "PhokU Media Library Manager" containing:
+
+A title label.
+
+A TextField to input the directory path.
+
+A "Scan" button.
+
+Three JList components: artists, albums, and tracks within JScrollPanes.
+
+A JLabel (status) to display status messages.
+
+Dynamic List Population:
+
+After clicking "Scan" and successful scanning, the artists JList should be populated with distinct artist names from the "main" table in the "music" database.
+
+When an artist is selected, the albums JList should be populated with distinct album names by the selected artist from the "main" table.
+
+When an album is selected, the tracks JList should be populated with track names from the selected album from the "main" table.
+
+Status Updates: The status label should display "Scanning directory...." while scanning and "Scan complete." after scanning is finished.
+
+Database Interaction: Queries to the "music" database to retrieve artist, album, and track data based on selections.
+
+Console Output: "Connection formed" upon successful database connection, and error messages (e.g., "SQLException caught in PhokUi", "Class not found", "Exception Occured in PhokUi", "SQLException occured in PhokUi") in case of exceptions.
+
+File 2: FileOps.java
+
+Purpose: This file is responsible for file system operations related to scanning directories for MP3 files, extracting ID3 tag information, and inserting this information into the "music" database.
+
+Inputs:
+
+Directory Path (String path): Passed to the constructor and getTrackList method, specifying the directory to scan.
+
+File System: Access to the file system to read directories and MP3 files.
+
+Expected Outputs:
+
+Database Updates:
+
+Upon instantiation, the constructor should:
+
+Establish a connection to the "music" database.
+
+Delete all existing records from the "main" table.
+
+Close the database connection.
+
+Call getTrackList to start scanning the directory.
+
+The insertIntoDb method should:
+
+Establish a connection to the "music" database.
+
+Insert a new record into the "main" table with the provided filename, track title, album, and artist.
+
+Close the database connection.
+
+Console Output: "Path doesn't exist or is not a directory" if the provided path is invalid or not a directory. "Other" in case of ID3Exception.
+
+Database Interaction:
+
+Connects to the "music" database.
+
+Executes DELETE FROM main to clear the table.
+
+Executes INSERT INTO main VALUES (...) to add new music information.
+
+Transformation to Java 17 Considerations:
+
+For Java 17, the primary changes would involve:
+
+JDBC Driver: The com.mysql.jdbc.Driver is deprecated. It should be replaced with com.mysql.cj.jdbc.Driver. The connection URL might also need adjustments depending on the MySQL Connector/J version.
+
+Swing: Swing is still supported in Java 17, so the GUI components should generally work without significant changes. However, it's good practice to ensure compatibility and consider modern UI frameworks in the long term.
+
+String Handling: The code uses new String() unnecessarily. In Java 17, direct string literals are more efficient.
+
+Exception Handling: The catch blocks are mostly empty or just print to System.out.println. More robust error handling and logging would be beneficial in a production application.
+
+Verification Scenarios:
+
+Here are detailed scenarios to verify the code's functionality:
+
+1. Basic GUI Functionality and Initialization:
+
+Scenario 1.1: Application Startup and Initial State
+
+Preconditions: MySQL server is running, "music" database exists with user "phoku" and password "phoku", and the "main" table exists (schema is not strictly defined in the code, but assumed to have columns for filename, track, album, artist).
+
+Steps:
+
+Run PhokUi.java.
+
+Expected Output:
+
+The "PhokU Media Library Manager" window appears.
+
+The window contains the title, directory TextField with default text "Browse Directory to list", "Scan" button, empty artist, album, and track lists, and status label showing "Idle".
+
+"Connection formed" is printed to the console, indicating successful database connection at startup.
+
+2. Directory Scanning and Database Population (Positive Cases):
+
+Scenario 2.1: Scanning a Directory with MP3 Files (ID3v1.0 Tags)
+
+Preconditions:
+
+MySQL database and server are running.
+
+The "main" table in the "music" database is empty.
+
+A test directory exists containing several MP3 files with valid ID3v1.0 tags (artist, album, track).
+
+Steps:
+
+Enter the path to the test directory in the TextField.
+
+Click the "Scan" button.
+
+Expected Output:
+
+Status label changes to "Scanning directory....", then to "Scan complete.".
+
+The artists JList is populated with distinct artist names extracted from the ID3v1.0 tags of the MP3 files in the scanned directory.
+
+The "main" table in the "music" database is populated with records corresponding to each MP3 file, including filename, track, album, and artist extracted from ID3v1.0 tags.
+
+Scenario 2.2: Scanning a Directory with MP3 Files (ID3v1.1 Tags)
+
+Preconditions: Similar to 2.1, but MP3 files should have valid ID3v1.1 tags.
+
+Steps: Same as 2.1.
+
+Expected Output: Similar to 2.1, but data is extracted from ID3v1.1 tags.
+
+Scenario 2.3: Scanning a Directory with Mixed ID3v1.0 and ID3v1.1 Tags
+
+Preconditions: Similar to 2.1, but the test directory contains MP3 files with both ID3v1.0 and ID3v1.1 tags.
+
+Steps: Same as 2.1.
+
+Expected Output: Similar to 2.1, correctly extracts and processes tags from both ID3 versions.
+
+Scenario 2.4: Scanning a Directory with Subdirectories containing MP3 Files
+
+Preconditions: Similar to 2.1, but the test directory contains subdirectories, and MP3 files are located in both the main directory and subdirectories.
+
+Steps: Same as 2.1.
+
+Expected Output: Similar to 2.1, the application should recursively scan subdirectories and include MP3 files from all levels in the database.
+
+3. Directory Scanning and Database Population (Negative/Edge Cases):
+
+Scenario 3.1: Scanning an Empty Directory
+
+Preconditions: MySQL database is running, "main" table is empty, and an empty directory exists.
+
+Steps:
+
+Enter the path to the empty directory.
+
+Click "Scan".
+
+Expected Output:
+
+Status label changes to "Scanning directory...." then "Scan complete.".
+
+The artists JList remains empty.
+
+The "main" table in the "music" database remains empty (or only contains data from previous scans if not cleared properly, which would be a bug, the code should clear it).
+
+Scenario 3.2: Scanning a Directory with No MP3 Files
+
+Preconditions: MySQL database running, "main" table empty, directory exists but contains no MP3 files.
+
+Steps:
+
+Enter path to the directory.
+
+Click "Scan".
+
+Expected Output:
+
+Status label changes to "Scanning directory...." then "Scan complete.".
+
+The artists JList remains empty.
+
+The "main" table in the "music" database should be empty (or cleared and remain empty).
+
+Scenario 3.3: Scanning an Invalid Directory Path
+
+Preconditions: MySQL database running, "main" table state irrelevant, an invalid directory path (non-existent or inaccessible).
+
+Steps:
+
+Enter an invalid path in the TextField.
+
+Click "Scan".
+
+Expected Output:
+
+Status label changes to "Scanning directory....", then "Scan complete." (This might be an incorrect status update, ideally it should indicate an error).
+
+Console output "Path doesn't exist or is not a directory" from FileOps.java.
+
+The artists JList remains unchanged from its previous state (likely empty initially).
+
+The "main" table in the "music" database should be cleared from previous scans, but no new data is added.
+
+Scenario 3.4: Scanning a Directory with Non-MP3 Files and MP3 Files with Missing/Incomplete ID3 Tags
+
+Preconditions: MySQL database running, "main" table state irrelevant, directory containing a mix of MP3 files (some with valid tags, some with missing or incomplete tags) and non-MP3 files (e.g., text files, images).
+
+Steps:
+
+Enter path to the directory.
+
+Click "Scan".
+
+Expected Output:
+
+Status label updates as expected.
+
+The artists JList is populated with artists extracted from MP3 files with valid ID3 tags.
+
+The "main" table contains entries only for MP3 files with valid ID3 tags. Files without tags or non-MP3 files should be ignored. The application should not crash or throw exceptions due to missing tags; ideally, it should handle them gracefully (perhaps by logging or skipping those files).
+
+4. List Selection and Dynamic Population:
+
+Scenario 4.1: Selecting an Artist and Populating Albums List
+
+Preconditions: Scenario 2.1 or similar has been run, and the artists JList is populated with at least one artist.
+
+Steps:
+
+Select an artist from the artists JList.
+
+Expected Output:
+
+The albums JList is populated with distinct album names by the selected artist, retrieved from the "main" table.
+
+The tracks JList is cleared.
+
+Scenario 4.2: Selecting an Album and Populating Tracks List
+
+Preconditions: Scenario 4.1 has been run, and the albums JList is populated with at least one album.
+
+Steps:
+
+Select an album from the albums JList.
+
+Expected Output:
+
+The tracks JList is populated with track names from the selected album, retrieved from the "main" table.
+
+Scenario 4.3: Selecting Different Artists/Albums and Observing List Updates
+
+Preconditions: Scenario 2.1 or similar has been run, and lists are populated.
+
+Steps:
+
+Select different artists from the artists JList in succession.
+
+For each artist, select different albums from the albums JList.
+
+Expected Output:
+
+The albums and tracks JLists update dynamically and correctly based on the artist and album selections. The lists should clear and repopulate as selections change.
+
+5. Database Connection and Error Handling:
+
+Scenario 5.1: Incorrect Database Credentials at Startup
+
+Preconditions: MySQL server running, but use incorrect username or password in PhokUi.java and FileOps.java.
+
+Steps:
+
+Run PhokUi.java.
+
+Expected Output:
+
+The application might fail to start or display an error message in the GUI or console indicating database connection failure. The "Connection formed" message should not be printed. Exception messages like "SQLException caught in PhokUi" or similar should be printed to the console.
+
+Scenario 5.2: MySQL Server Not Running
+
+Preconditions: MySQL server is not running.
+
+Steps:
+
+Run PhokUi.java.
+
+Expected Output:
+
+Application might fail to start or display an error. Error messages in the console indicating connection failure, similar to Scenario 5.1.
+
+Scenario 5.3: Database "music" Does Not Exist
+
+Preconditions: MySQL server running, but the "music" database does not exist.
+
+Steps:
+
+Run PhokUi.java.
+
+Expected Output:
+
+The application might fail to start or display an error. Error messages in the console indicating database not found or connection failure.
+
+6. Rescanning Directory:
+
+Scenario 6.1: Rescanning the Same Directory - Data Update
+
+Preconditions: Scenario 2.1 has been run, database populated. Modify ID3 tags of some MP3 files in the scanned directory (e.g., change artist names).
+
+Steps:
+
+Without closing the application, click "Scan" again with the same directory path.
+
+Expected Output:
+
+Status messages are displayed.
+
+The "main" table in the database is cleared and repopulated.
+
+The artists JList is updated to reflect the changes made to the ID3 tags.
+
+Scenario 6.2: Scanning a Different Directory After a Previous Scan
+
+Preconditions: Scenario 2.1 has been run, database populated. A second directory exists with different MP3 files.
+
+Steps:
+
+Enter the path to the second directory in the TextField.
+
+Click "Scan".
+
+Expected Output:
+
+Status messages are displayed.
+
+The "main" table is cleared and repopulated with data from the second directory.
+
+The artists, albums, and tracks JLists are updated to reflect the music in the second directory.
+
+These scenarios cover a range of positive, negative, and edge cases to thoroughly test the functionality of the "PhokU Media Library Lister" application. For Java 17 transformation, ensure to re-run these tests after making the necessary code adjustments (like JDBC driver update) to confirm continued functionality.
+
