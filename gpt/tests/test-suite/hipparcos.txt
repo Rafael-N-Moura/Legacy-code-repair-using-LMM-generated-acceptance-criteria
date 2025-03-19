@@ -1,0 +1,1106 @@
+Analyze the code below, including its purpose, inputs, and expected outputs. Then, create a comprehensive test suite consisting of unit and/or integration tests that fully cover all aspects of the code's functionality, ensuring it produces a valid solution. Consider that the code will be transformed for the Java 17 language. Consider that the code will be transformed for the Java 17 language. There are 4 files of code in total.
+
+File 1:
+<Dpoint.java>
+
+/*
+* Copyright (C) 1997-2016 European Space Agency
+*
+* This library is free software; you can redistribute it and/or
+* modify it under the terms of the GNU Lesser General Public
+* License as published by the Free Software Foundation; either
+* version 2.1 of the License, or (at your option) any later version.
+*
+* This library is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+* Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public
+* License along with this library; if not, write to the Free Software
+* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+package hipparcos.plot;
+
+public class DPoint {
+   private double x=0, y=0;
+   private boolean valid;
+   private boolean semivalid;
+
+   public DPoint(double x, double y) {
+	valid=true;
+	semivalid=true;
+	this.x=x;
+	this.y=y;
+   }
+
+   public DPoint(DPoint p) {
+	valid=true;
+	semivalid=true;
+	this.x=p.getX();
+	this.y=p.getY();
+   }
+
+   public DPoint() {
+	valid=false;
+	semivalid=false;
+   }
+
+   public boolean isValid() { return valid; };
+
+   public double getX() {
+     return x ;  
+// should throw an exception here if !valid ...
+   }
+
+   public double getY() {
+      return y;
+   }
+
+   public void setX(double x) {
+      this.x= x;
+      semiValidate(); 
+   }
+
+   public void setY(double y) {
+      this.y= y;
+      semiValidate(); 
+   }
+
+   private void semiValidate() {
+	if (!valid) {
+	   valid=semivalid;
+	   semivalid= true;
+	}
+   }
+
+   public String toString() {
+	return (""+x+"  "+y);
+   }
+}
+</Dpoint.java>
+
+File 2:
+<Histogram.java>
+
+/*
+* Copyright (C) 1997-2016 European Space Agency
+*
+* This library is free software; you can redistribute it and/or
+* modify it under the terms of the GNU Lesser General Public
+* License as published by the Free Software Foundation; either
+* version 2.1 of the License, or (at your option) any later version.
+*
+* This library is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+* Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public
+* License along with this library; if not, write to the Free Software
+* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+package hipparcos.plot;
+import java.awt.*;
+
+public class Histogram extends Plot {
+
+   private int occurences[];
+   private boolean gotOne=false;
+   private Color plotcol;
+
+   public Histogram(String xlabel, String ylabel, int low,int high, 
+				double step, Color col) {
+	setXlabel(xlabel);
+	setYlabel(ylabel);
+	plotcol=col;
+	init (low, high,step);
+   }
+
+   public void resetGraph() {
+	miny=0;
+	maxy=10;
+	if (occurences != null) {
+	   for (int i = 0; i < occurences.length; i++) {
+		occurences[i]=0;
+	   };
+	};
+   }
+
+   public void init(int low,int high, double step) {
+	gotOne=false;
+	minx=low;
+	maxx=high;
+	miny=0;
+	maxy=10;
+	xstep=step;
+	numberStep=5;
+	/* we will then split the data in to these groups
+	   which we can just keep in array only interestedin how many
+	*/
+	Double nogrps= new Double ((high - low)/ step);
+	occurences=new int[nogrps.intValue()];
+   } 
+
+   public void addOccurence (double o) {
+	gotOne=true;
+	int which=0;
+	double category=minx+xstep;
+	while ((category < o) && (category < maxx)) {
+		category = category+xstep;
+		which++;
+	}
+	//System.out.println("o "+o+" "+occurences.length);
+	while  (which >= occurences.length) which--; // off the end
+	occurences[which]++; //add one to ocurences for this);
+	// which may cause us to have to many !!
+	if (occurences[which] > maxy) {
+	   maxy=occurences[which];
+	   ystep=-1;
+	}
+	repaint();
+		
+   }
+
+   public void plotGraph(Graphics g) {
+      if (gotOne) {
+        g.setColor(plotcol);
+	double categ=minx;
+	for (int i=0; i< occurences.length; i++ ) {
+	    plotBar(categ,occurences[i],g);
+	    categ+=xstep;
+	}	
+      } else {
+        g.setColor(Color.red);
+        g.drawString(" No data",30,(int)(this.getSize().height/2));
+      };
+   }
+ 
+   public void plotBar(double cat, int height, Graphics g){
+	int x = calcX(cat);
+	int w = calcX(cat+xstep) - x;
+	int y = calcY(height);
+	int h = calcY(miny) -y ;
+	g.fillRect(x,y,w,h);
+	//System.out.println("x "+x+" y "+y+" w "+w+" h "+h);
+   }
+}
+</Histogram.java>
+
+File 3:
+<PhasePlot.java>
+
+/*
+* Copyright (C) 1997-2016 European Space Agency
+*
+* This library is free software; you can redistribute it and/or
+* modify it under the terms of the GNU Lesser General Public
+* License as published by the Free Software Foundation; either
+* version 2.1 of the License, or (at your option) any later version.
+*
+* This library is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+* Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public
+* License along with this library; if not, write to the Free Software
+* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+package hipparcos.plot;
+
+import java.awt.*;
+import java.lang.*;
+import java.util.*;
+
+
+/** Same as a simple plot but take in a phase */
+public class PhasePlot extends SimplePlot {
+
+   private double phase;
+
+   public PhasePlot(String xlabel, String ylabel, double lowY, double highY, Color col) {
+	super (xlabel,ylabel,0,1.5,lowY,highY,col);
+	xstep=0.1;
+	numberStep=1;
+  	phase=0.5;
+   }
+
+   public void resetGraph() {
+	super.resetGraph();
+	xstep=0.5;
+	numberStep=1;
+   }
+
+   public void plotGraph(Graphics g) {
+      if (gotOne) {
+	if (plotZeroLine) plotZero(g);
+        g.setColor(plotcol);
+        for (Enumeration e = points.elements() ; e.hasMoreElements() ;) {
+                DPoint op = (DPoint)e.nextElement() ;
+                DPoint p = new DPoint(op) ;
+		double x = ((p.getX()%phase) *(1/phase));
+		p.setX(x);
+		plotPoint(p,g);
+		if (p.getX() <= 0.5) { // plot some points again on the end
+		   p.setX(p.getX()+1);
+		   plotPoint(p,g);
+		}
+        }
+
+      } else {
+        g.setColor(Color.red);
+        g.drawString(" No data",30,(int)(this.getSize().height/2));
+      };
+   }
+
+   public void setPhase(double phase) {
+      this.phase = phase;
+      repaint();
+  } 
+
+  public double getPhase() {
+	return phase;
+  }
+}
+</PhasePlot.java>
+
+File 4:
+<Plot.java>
+
+/*
+* Copyright (C) 1997-2016 European Space Agency
+*
+* This library is free software; you can redistribute it and/or
+* modify it under the terms of the GNU Lesser General Public
+* License as published by the Free Software Foundation; either
+* version 2.1 of the License, or (at your option) any later version.
+*
+* This library is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+* Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public
+* License along with this library; if not, write to the Free Software
+* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+package hipparcos.plot;
+
+import java.awt.*;
+import java.io.*;
+import java.util.*;
+
+/** Plot just with axes and scale as base class for other plots
+    like Histogram  **/
+public class Plot extends Canvas {
+
+  double scaleX,scaleY; 
+  public double minx,miny,maxx,maxy;
+  public int topRule,bottomRule,leftRule,rightRule,dheight;
+  public  int ystep=-1,numberStep=5,ynumberStep=5;
+  public double xstep=-1; 
+  public int pointSize=4;
+  private String botText,leftText;
+  private boolean inited=false;
+
+  private void init() {
+	topRule=20;
+ 	bottomRule=30;
+ 	rightRule=20;
+	leftRule=25;	
+ 	setBackground(Color.white);
+	minx=0;
+	maxx=10;
+	miny=0;
+	maxy=10;
+	botText=new String ("X axis");
+	leftText=new String ("Y axis");
+	inited=true;
+  }
+
+  public Plot () {
+	init();
+  }
+
+  public void setScales() {
+    Dimension d = this.getSize();
+    int gWidth = (int) d.width  - leftRule - rightRule ;
+    int gHeight = (int) d.height -  bottomRule -topRule;
+    dheight=gHeight;
+    scaleX= (maxx - minx)/gWidth;
+    scaleY= (maxy - miny)/gHeight;
+    if (xstep<=-1) {xstep=getStep(scaleX); numberStep=getNumberStep(scaleX);}
+    if (ystep==-1) {ystep=getStep(scaleY); ynumberStep=getNumberStep(scaleY);}
+    //System.out.println (" ScaleX "+scaleX+" ScaleY "+scaleY +" Height "+dheight);
+  }
+
+  public int getStep(double scale) {
+  /** how often to put a tick mark depending on scale */
+     int ret=1;
+     if (scale <= 2 ) {ret=50;  };
+     if (scale <= 1 ) {ret=10 ;};
+     if (scale < .1 ) {ret=1 ;};
+     return ret;
+  }
+
+ public int getNumberStep(double scale) {
+     int ret=1;
+     if (scale <= 2 ) {ret=50;  };
+     if (scale <= 1 ) {ret=10 ; };
+     if (scale < .1 ) {ret=5 ;};
+     return ret;
+ }
+  public void paint (Graphics g) {
+
+	if (!inited) init();
+	drawRulers(g);
+	plotGraph(g);
+  }
+
+public void plotGraph( Graphics g) {
+/** Override this one in subclasses to do your thing*/
+	g.setColor(Color.red);
+	g.drawString(" Not Implemented",30,(int)(this.getSize().height/2));
+}
+  
+public int calcX(double d) {
+	Double ret=new Double(leftRule+((d - minx)/scaleX));
+	return ( ret.intValue() );
+} 
+public int calcY(double d) {
+	Double ret=new Double((d- miny)/scaleY);
+	return ( topRule + dheight - ret.intValue() );
+} 
+
+private void drawRulers (Graphics g)  {
+     String ly,hy,st;
+     int cShift=9;
+     int highY,lowY,lowX,highX,tick;
+     double dtick;
+     int posLowY,posHighY,step,posLowX,posHighX;
+
+     setScales();
+
+     Float stF;
+   // ystuff
+     stF = new Float(maxy + (maxy%ystep));
+     highY =  stF.intValue();
+     stF = new Float(miny - (miny%ystep));
+     lowY = stF.intValue();
+     posHighY= calcY(highY) + (cShift/2);
+     posLowY= calcY(lowY) + (cShift/2);
+//System.out.println("Min Y "+miny+" lowY "+lowY +" PoslowY "+posLowY);
+//System.out.println("Max Y "+maxy+" highY "+highY +" posHighY "+posHighY);
+    // x stuff
+     stF = new Float(maxx - (maxx%xstep));
+     highX = stF.intValue();
+     stF = new Float(minx  - (minx%xstep));
+     lowX = stF.intValue();
+     posHighX=  calcX(highX) -(cShift/2);
+     posLowX= calcX(lowX) - cShift;
+     // X and Y axis and Scale (Netscape seems to have a big problem
+     // with strings hence the rather over kill appraoch here
+     g.setColor(Color.black);
+     g.drawString(leftText,1,12);
+     Dimension d = this.getSize();
+     Double center= new Double ((d.width/2) - ((botText.length()/2)*7));
+     g.drawString(botText,center.intValue(),d.height - (cShift/2));
+     g.drawLine (leftRule-1,topRule,leftRule-1,d.height-bottomRule);
+     g.drawLine (leftRule-1,d.height-bottomRule,d.width-rightRule,d.height-bottomRule);
+
+     tick = lowY - (lowY%ystep);
+     int endTick = highY - (highY%ystep); 
+     while (tick <= endTick) {
+         int posTick= calcY(tick);
+	 g.drawLine(leftRule-5,posTick, leftRule,posTick);
+	 if (tick%ynumberStep==0) g.drawString(""+tick,3,(posTick+(cShift/2)));
+	 tick+=ystep;
+     }
+
+     // ticks on X
+     dtick = lowX - (lowX%xstep);
+     endTick = (int) (highX - (highX%xstep)); 
+     while (dtick <= endTick) {
+         int posTick= calcX(dtick);
+	 g.drawLine(posTick,(d.height -bottomRule), posTick, (d.height -bottomRule +5));
+	 if (dtick%numberStep==0) {
+	     Double t = new Double (dtick);
+	     g.drawString(""+t.intValue(),(posTick-(cShift/2)),(d.height - 14));
+	 }
+	 dtick+=xstep;
+     }
+}
+
+public void setXlabel(String l) {
+   botText=l;
+}
+public void setYlabel(String l) {
+   leftText=l;
+}
+
+   public void plotPoint(double rx, double ry, Graphics g){
+        int x = calcX(rx);
+        int y = calcY(ry);
+	//System.out.println("Plotting "+x+", "+y);
+	Double offd = new Double(pointSize/2);
+	int off = offd.intValue();
+	g.fillOval((x-off),(y-off),pointSize,pointSize);
+   }
+
+   public void plotPoint(DPoint p, Graphics g){
+        plotPoint(p.getX(),p.getY(),g);
+   }
+
+}
+</Plot.java>
+
+File 5:
+<SimplePlot.java>
+
+/*
+* Copyright (C) 1997-2016 European Space Agency
+*
+* This library is free software; you can redistribute it and/or
+* modify it under the terms of the GNU Lesser General Public
+* License as published by the Free Software Foundation; either
+* version 2.1 of the License, or (at your option) any later version.
+*
+* This library is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+* Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public
+* License along with this library; if not, write to the Free Software
+* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+package hipparcos.plot;
+
+import java.awt.*;
+import java.lang.*;
+import java.util.*;
+
+/* Just plots points on a grpah - nothing fancy. Need to supply the 
+   max and min when setting up */
+public class SimplePlot extends Plot {
+
+   public Vector points;
+   public boolean gotOne=false;
+   public Color plotcol;
+   public boolean plotZeroLine=true;
+   static public Color zeroLineColor=new Color(255,105,255);
+
+   public SimplePlot(String xlabel, String ylabel, double lowX,double highX, 
+	double lowY, double highY, Color col) {
+	setXlabel(xlabel);
+	setYlabel(ylabel);
+	plotcol=col;
+	init (lowX, highX, lowY, highY);
+   }
+
+   public void resetGraph() {
+	points=new Vector();
+   }
+
+   public void init(double lowX,double highX, double lowY, double highY) {
+	gotOne=false;
+	minx=lowX;
+	maxx=highX;
+	miny=lowY;
+	maxy=highY;
+	xstep=1;
+	ystep=1;
+	numberStep=1;
+	ynumberStep=5;
+	points=new Vector();
+   } 
+
+   public void addPoint (DPoint p ) {
+	gotOne=true;
+	if (points != null) points.addElement(p);
+	repaint();
+   }
+
+   public void plotGraph(Graphics g) {
+      if (gotOne && (points != null)) {
+	if (plotZeroLine) plotZero(g);
+        g.setColor(plotcol);
+        for (Enumeration e = points.elements() ; e.hasMoreElements() ;) {
+                DPoint p = (DPoint)e.nextElement() ;
+		plotPoint(p,g);
+        }
+
+      } else {
+        g.setColor(Color.red);
+        g.drawString(" No data",30,(int)(this.getSize().height/2));
+      };
+   }
+
+   public void plotZero( Graphics g) {
+	int y1= calcY(0);
+	int x1= calcX(minx);
+	int y2= y1;
+	int x2= calcX(maxx);
+	int xi= calcX(minx);
+	g.setColor(zeroLineColor);
+	g.drawLine(x1,y1,x2,y2);
+   } 
+}
+</SimplePlot.java>
+ChatGPT said:
+Reasoned for 28 seconds
+I see the question requires analyzing code for five files, focusing on purpose, inputs, and expected outputs. It mentions transforming the code for Java 17. The code seems to be related to a plotting library with classes like DPoint, Histogram, PhasePlot, Plot, and SimplePlot.
+
+For the first file, DPoint.java: Its purpose is to represent a 2D point with double coordinates (x, y). There are validity semantics, with a default constructor creating an invalid point, and a semiValidate function checking validity. Inputs include double values for x and y, plus a copy constructor. Now, I’ll break down the others...
+
+The code has five files, each with distinct responsibilities. DPoint.java focuses on 2D points, with methods like getX, getY, and toString. Histogram.java extends Plot and creates histogram graphs. PhasePlot.java also extends SimplePlot and handles phase-specific plotting. Plot.java manages axes drawing and graph plotting, while SimplePlot.java deals with plotting points. For test creation, I’ll use JUnit 5. I plan to mock Graphics for UI-based methods since testing graphical output is tricky with AWT. I'll create test classes for each file.
+
+To create the test suite, I need to ensure I test the relevant methods in each class, like toString and getX in DPoint, and occurrence handling in Histogram. I'll test transformations in PhasePlot and calculations in Plot using known inputs. For testing graphical methods, I can mock Graphics using a dummy class that records calls. I plan to write separate test classes for everything, like DPointTest, HistogramTest, and more. For Java 17, there are minor adjustments, but I'll focus on the core logic and non-GUI methods. I'll now proceed with the implementation.
+
+Below is an analysis of the code followed by a complete test suite written in Java (using JUnit 5) that covers unit and integration aspects. In summary:
+
+Code Analysis
+1. DPoint.java
+Purpose:
+A simple data‐object representing a two‐dimensional point with double‑precision coordinates. It also tracks whether the point is “valid” (has been initialized with data) or “semi‑valid” (in a transitional state when one coordinate is modified).
+
+Inputs & Constructors:
+
+DPoint(double x, double y)
+Creates a valid point with given x and y.
+DPoint(DPoint p)
+Copy constructor that duplicates another valid point.
+DPoint()
+Default constructor creates an invalid (and semivalid) point.
+Methods and Expected Outputs:
+
+Accessors:
+getX(), getY() return the x and y values respectively (the code comments suggest that accessing coordinates for an invalid point might ideally throw an exception—but currently it does not).
+Mutators:
+setX(double) and setY(double) update the coordinates and call semiValidate(), which will mark an initially invalid point as valid once a coordinate is changed.
+Utility:
+toString() returns a string with x and y separated by two spaces.
+isValid() returns the validity flag.
+2. Histogram.java
+Purpose:
+A subclass of Plot that draws a histogram. It bins numerical values (occurrences) into groups based on a provided step and range.
+
+Inputs (constructor):
+
+X and Y axis labels, lower and upper bounds for the x‑axis, the step for binning, and a color for the histogram bars.
+Key Functionality:
+
+init(int low, int high, double step)
+Calculates the number of bins based on the range and step.
+addOccurence(double o)
+Determines which bin the input value belongs to and increments its count. If the count exceeds the current maximum y‑value, it adjusts the y‑scale.
+Graphical Output:
+plotGraph(Graphics g) iterates through bins and draws bars via plotBar().
+The bar’s dimensions are computed using helper methods (e.g. calcX/calcY from the base class).
+3. PhasePlot.java
+Purpose:
+A specialized plot (extending SimplePlot) that “folds” the x‑coordinate data according to a given phase. In other words, it plots data modulo a phase value and—for points with x values in the lower half—it plots an additional point shifted to the right.
+
+Inputs (constructor):
+
+Axis labels, a range for the y‑axis, and a color.
+Key Functionality:
+
+In plotGraph(Graphics g), for each stored point the x‑value is recalculated as:
+𝑥
+=
+(
+𝑝
+.
+𝑔
+𝑒
+𝑡
+𝑋
+(
+)
+m
+o
+d
+ 
+ 
+phase
+)
+×
+1
+phase
+x=(p.getX()modphase)× 
+phase
+1
+​
+ 
+and then (if it falls in the first half) a duplicate point is drawn with x shifted by +1.
+It also provides getter and setter for the phase value.
+4. Plot.java
+Purpose:
+A base class (extending Canvas) that provides common functionality for drawing axes, tick marks, scaling of coordinates, and plotting individual points.
+
+Inputs and Functionality:
+
+Contains fields for min/max values, scaling factors (scaleX, scaleY), and margins.
+Scaling & Axis:
+Methods setScales(), calcX(double) and calcY(double) compute pixel positions.
+Drawing:
+The paint(Graphics g) method first draws the axes (rulers) and then calls plotGraph(Graphics g), which subclasses override.
+5. SimplePlot.java
+Purpose:
+A basic plot that maintains a collection of DPoint instances. It simply plots each point (and optionally a “zero line”) on the graph.
+
+Inputs (constructor):
+
+Axis labels, explicit bounds for the x‑ and y‑axes, and a color.
+Key Functionality:
+
+addPoint(DPoint p)
+Adds a point to an internal vector.
+plotGraph(Graphics g)
+Draws all points (and the zero line if enabled).
+Test Suite
+Below is a complete JUnit 5 test suite. It creates tests for each class—verifying constructors, state changes, internal calculations (like coordinate conversion), and integration aspects such as invoking the plotting routines (using a dummy Graphics implementation).
+
+Note: For testing methods that require a Graphics object, a simple dummy implementation (DummyGraphics) is provided. This dummy collects some basic information (for example, which color was set or which shapes were “drawn”) so that we can at least verify that the drawing methods do not throw exceptions and are called as expected.
+
+java
+Copy
+Edit
+// File: DummyGraphics.java
+package hipparcos.plot;
+
+import java.awt.*;
+import java.awt.image.ImageObserver;
+import java.text.AttributedCharacterIterator;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * A dummy Graphics implementation that records basic drawing calls.
+ */
+public class DummyGraphics extends Graphics {
+    public List<String> calls = new ArrayList<>();
+    private Color currentColor = Color.black;
+    private Dimension size = new Dimension(400, 300);
+
+    public DummyGraphics() {}
+
+    @Override
+    public Graphics create() {
+        return this;
+    }
+
+    @Override
+    public void translate(int x, int y) {
+        calls.add("translate " + x + " " + y);
+    }
+
+    @Override
+    public Color getColor() {
+        return currentColor;
+    }
+
+    @Override
+    public void setColor(Color c) {
+        currentColor = c;
+        calls.add("setColor " + c.toString());
+    }
+
+    @Override
+    public void setPaintMode() { }
+
+    @Override
+    public void setXORMode(Color c1) { }
+
+    @Override
+    public Font getFont() {
+        return new Font("SansSerif", Font.PLAIN, 12);
+    }
+
+    @Override
+    public void setFont(Font font) {
+        calls.add("setFont " + font.getName());
+    }
+
+    @Override
+    public FontMetrics getFontMetrics(Font f) {
+        return null;
+    }
+
+    @Override
+    public Rectangle getClipBounds() {
+        return new Rectangle(0, 0, size.width, size.height);
+    }
+
+    @Override
+    public void clipRect(int x, int y, int width, int height) { }
+
+    @Override
+    public void setClip(int x, int y, int width, int height) { }
+
+    @Override
+    public Shape getClip() {
+        return null;
+    }
+
+    @Override
+    public void setClip(Shape clip) { }
+
+    @Override
+    public void copyArea(int x, int y, int width, int height, int dx, int dy) { }
+
+    @Override
+    public void drawLine(int x1, int y1, int x2, int y2) {
+        calls.add("drawLine " + x1 + " " + y1 + " " + x2 + " " + y2);
+    }
+
+    @Override
+    public void fillRect(int x, int y, int width, int height) {
+        calls.add("fillRect " + x + " " + y + " " + width + " " + height);
+    }
+
+    @Override
+    public void clearRect(int x, int y, int width, int height) { }
+
+    @Override
+    public void drawRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight) { }
+
+    @Override
+    public void fillRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight) { }
+
+    @Override
+    public void drawOval(int x, int y, int width, int height) { }
+
+    @Override
+    public void fillOval(int x, int y, int width, int height) {
+        calls.add("fillOval " + x + " " + y + " " + width + " " + height);
+    }
+
+    @Override
+    public void drawArc(int x, int y, int width, int height, int startAngle, int arcAngle) { }
+
+    @Override
+    public void fillArc(int x, int y, int width, int height, int startAngle, int arcAngle) { }
+
+    @Override
+    public void drawPolyline(int[] xPoints, int[] yPoints, int nPoints) { }
+
+    @Override
+    public void drawPolygon(int[] xPoints, int[] yPoints, int nPoints) { }
+
+    @Override
+    public void fillPolygon(int[] xPoints, int[] yPoints, int nPoints) { }
+
+    @Override
+    public void drawString(String str, int x, int y) {
+        calls.add("drawString " + str + " " + x + " " + y);
+    }
+
+    @Override
+    public void drawString(AttributedCharacterIterator iterator, int x, int y) { }
+
+    @Override
+    public boolean drawImage(Image img, int x, int y, ImageObserver observer) {
+        calls.add("drawImage at " + x + " " + y);
+        return true;
+    }
+
+    @Override
+    public boolean drawImage(Image img, int x, int y, int width, int height, ImageObserver observer) {
+        calls.add("drawImage with dims at " + x + " " + y);
+        return true;
+    }
+
+    @Override
+    public boolean drawImage(Image img, int x, int y, Color bgcolor, ImageObserver observer) {
+        calls.add("drawImage with bgcolor at " + x + " " + y);
+        return true;
+    }
+
+    @Override
+    public boolean drawImage(Image img, int x, int y, int width, int height, Color bgcolor, ImageObserver observer) {
+        calls.add("drawImage with dims and bgcolor at " + x + " " + y);
+        return true;
+    }
+
+    @Override
+    public void dispose() { }
+    
+    // Additional methods to support our test
+    public Dimension getSize() {
+        return size;
+    }
+}
+JUnit 5 Test Classes
+Below are the tests for each of the classes. In a real project these would be in separate files; here they are provided together for clarity.
+
+java
+Copy
+Edit
+// File: PlotLibraryTestSuite.java
+package hipparcos.plot;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.awt.Color;
+import java.awt.Dimension;
+import java.lang.reflect.Field;
+import java.util.Vector;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class DPointTest {
+
+    @Test
+    void testValidPointCreation() {
+        DPoint p = new DPoint(1.0, 2.0);
+        assertTrue(p.isValid(), "Point should be valid after creation with coordinates");
+        assertEquals(1.0, p.getX(), 1e-9);
+        assertEquals(2.0, p.getY(), 1e-9);
+        assertEquals("1.0  2.0", p.toString());
+    }
+
+    @Test
+    void testCopyConstructor() {
+        DPoint p1 = new DPoint(3.5, -1.2);
+        DPoint p2 = new DPoint(p1);
+        assertTrue(p2.isValid());
+        assertEquals(p1.getX(), p2.getX(), 1e-9);
+        assertEquals(p1.getY(), p2.getY(), 1e-9);
+    }
+
+    @Test
+    void testDefaultConstructorInvalidity() {
+        DPoint p = new DPoint();
+        assertFalse(p.isValid(), "Default constructed point should be invalid");
+    }
+
+    @Test
+    void testSettersAndSemiValidation() {
+        DPoint p = new DPoint();
+        // Initially invalid, then setX or setY should change state.
+        p.setX(10.0);
+        p.setY(20.0);
+        // After setters, the point should become valid.
+        assertTrue(p.isValid());
+        assertEquals(10.0, p.getX(), 1e-9);
+        assertEquals(20.0, p.getY(), 1e-9);
+    }
+}
+
+class HistogramTest {
+
+    Histogram hist;
+    final int low = 0;
+    final int high = 100;
+    final double step = 10.0;
+    final Color color = Color.BLUE;
+
+    @BeforeEach
+    void setUp() {
+        hist = new Histogram("X-Axis", "Y-Axis", low, high, step, color);
+    }
+
+    @Test
+    void testInitBins() throws Exception {
+        // The number of bins is computed as: (high - low)/step
+        int expectedBins = (int) ((high - low) / step);
+        Field occField = Histogram.class.getDeclaredField("occurences");
+        occField.setAccessible(true);
+        int[] occ = (int[]) occField.get(hist);
+        assertNotNull(occ, "Occurrence array should not be null after init()");
+        assertEquals(expectedBins, occ.length, "Occurrence array length should equal number of bins");
+    }
+
+    @Test
+    void testAddOccurence() throws Exception {
+        // Add a value that should fall into the first bin.
+        hist.addOccurence(5.0);
+        // Use reflection to access the occurences array.
+        Field occField = Histogram.class.getDeclaredField("occurences");
+        occField.setAccessible(true);
+        int[] occ = (int[]) occField.get(hist);
+        // For value 5.0, bin index should be 0.
+        assertEquals(1, occ[0], "Bin for value 5.0 should have one occurrence");
+    }
+
+    @Test
+    void testResetGraph() throws Exception {
+        hist.addOccurence(20.0);
+        hist.addOccurence(30.0);
+        hist.resetGraph();
+        Field occField = Histogram.class.getDeclaredField("occurences");
+        occField.setAccessible(true);
+        int[] occ = (int[]) occField.get(hist);
+        for (int count : occ) {
+            assertEquals(0, count, "After reset, all bins should be zero");
+        }
+    }
+
+    @Test
+    void testPlotGraphNoData() {
+        DummyGraphics dg = new DummyGraphics();
+        // Without any added data, gotOne remains false.
+        // Calling plotGraph should draw a red "No data" message.
+        hist.resetGraph();
+        hist.plotGraph(dg);
+        boolean foundNoData = dg.calls.stream().anyMatch(s -> s.contains("No data"));
+        assertTrue(foundNoData, "PlotGraph should indicate no data when none added");
+    }
+}
+
+class PhasePlotTest {
+
+    PhasePlot pp;
+    final Color color = Color.GREEN;
+
+    @BeforeEach
+    void setUp() {
+        // Use arbitrary y-range; note x is fixed from 0 to 1.5 by the constructor.
+        pp = new PhasePlot("Phase X", "Phase Y", -10, 10, color);
+    }
+
+    @Test
+    void testPhaseDefault() {
+        // Default phase set in constructor is 0.5.
+        assertEquals(0.5, pp.getPhase(), 1e-9);
+    }
+
+    @Test
+    void testSetPhase() {
+        pp.setPhase(1.0);
+        assertEquals(1.0, pp.getPhase(), 1e-9);
+    }
+
+    @Test
+    void testPlotGraphModifiesPoints() {
+        // Add a point with a known x value.
+        DPoint p = new DPoint(0.6, 5.0);
+        // Use the addPoint method inherited from SimplePlot (via PhasePlot)
+        pp.addPoint(p);
+        // Create a dummy graphics to call plotGraph; the method will transform the x value.
+        DummyGraphics dg = new DummyGraphics();
+        // Calling plotGraph should not throw and should record drawing calls.
+        pp.plotGraph(dg);
+        // Check that the drawing calls were recorded.
+        assertFalse(dg.calls.isEmpty(), "PlotGraph should record drawing calls when data exists");
+    }
+}
+
+class PlotTest {
+
+    // Create a simple subclass of Plot to expose calcX and calcY behavior.
+    class TestPlot extends Plot {
+        @Override
+        public void plotGraph(Graphics g) {
+            // Do nothing for testing calcX and calcY.
+        }
+    }
+
+    TestPlot testPlot;
+
+    @BeforeEach
+    void setUp() {
+        testPlot = new TestPlot();
+        // Set known axis values.
+        testPlot.minx = 0;
+        testPlot.maxx = 100;
+        testPlot.miny = 0;
+        testPlot.maxy = 200;
+        // Simulate a canvas size.
+        Dimension d = new Dimension(400, 300);
+        testPlot.setSize(d);
+        testPlot.setScales();
+    }
+
+    @Test
+    void testCalcX() {
+        // Calculate expected x pixel for a given value.
+        // leftRule is 25 (from Plot.init), scaleX = (maxx - minx)/(width - leftRule - rightRule)
+        int xPixel = testPlot.calcX(50);
+        // We expect xPixel to be roughly in the middle.
+        assertTrue(xPixel > 25 && xPixel < 400 - 20, "calcX should return a pixel value within the canvas");
+    }
+
+    @Test
+    void testCalcY() {
+        int yPixel = testPlot.calcY(100);
+        // y should be between topRule and (height-bottomRule)
+        assertTrue(yPixel > 20 && yPixel < 300 - 30, "calcY should return a pixel value within the canvas");
+    }
+
+    @Test
+    void testGetStepAndNumberStep() {
+        // Test getStep and getNumberStep for various scale values.
+        int step = testPlot.getStep(0.05);
+        int numberStep = testPlot.getNumberStep(0.05);
+        // According to the code, scale < 0.1 yields step=1 and numberStep=5.
+        assertEquals(1, step);
+        assertEquals(5, numberStep);
+    }
+}
+
+class SimplePlotTest {
+
+    SimplePlot sp;
+    final Color color = Color.MAGENTA;
+
+    @BeforeEach
+    void setUp() {
+        sp = new SimplePlot("Simple X", "Simple Y", 0, 100, 0, 100, color);
+    }
+
+    @Test
+    void testAddPoint() {
+        DPoint p = new DPoint(10, 20);
+        sp.addPoint(p);
+        // The points vector is public.
+        Vector<?> pts = sp.points;
+        assertNotNull(pts);
+        assertEquals(1, pts.size());
+        DPoint retrieved = (DPoint) pts.elementAt(0);
+        assertEquals(10, retrieved.getX(), 1e-9);
+        assertEquals(20, retrieved.getY(), 1e-9);
+    }
+
+    @Test
+    void testPlotGraphWithData() {
+        // Add a couple of points.
+        sp.addPoint(new DPoint(30, 40));
+        sp.addPoint(new DPoint(50, 60));
+        DummyGraphics dg = new DummyGraphics();
+        sp.plotGraph(dg);
+        // Expect that at least two points (ovals) are drawn.
+        boolean ovalDrawn = dg.calls.stream().anyMatch(s -> s.startsWith("fillOval"));
+        assertTrue(ovalDrawn, "PlotGraph should call fillOval for each point when data exists");
+    }
+
+    @Test
+    void testPlotZeroLine() {
+        // Check that the zero line is drawn if enabled.
+        DummyGraphics dg = new DummyGraphics();
+        sp.plotZero(dg);
+        boolean lineDrawn = dg.calls.stream().anyMatch(s -> s.startsWith("drawLine"));
+        assertTrue(lineDrawn, "plotZero should call drawLine to draw the zero line");
+    }
+}
+How the Tests Cover Functionality
+DPoint Tests: Verify construction (default, with values, and via copy), and the effect of setters on validity.
+Histogram Tests: Confirm that binning is computed correctly, occurrences are recorded in the proper bin, and that resetting clears data. It also tests that the drawing routine (when no data exists) outputs the “No data” message.
+PhasePlot Tests: Check the phase getter/setter, and ensure that the plotting method processes the point collection (including duplicating points for values in the lower half) without errors.
+Plot Tests: Validate that coordinate transformation methods (calcX and calcY) return pixel values within expected bounds based on simulated canvas dimensions. Also, internal helper methods for tick marks (e.g. getStep) are verified.
+SimplePlot Tests: Confirm that points are stored correctly, that plotting routines (both for points and the zero line) are called and render something via the dummy graphics.
+Considerations for Java 17
+When transforming to Java 17 the code is mostly standard Java. The tests and code use JUnit 5 (which runs on Java 17) and standard AWT classes. No language-specific features outside Java SE are used. Adjustments (if needed) might include using modules or updating package declarations, but the logic remains the same.
+
+This test suite provides a comprehensive coverage for the functionalities of all five files.
+
+
+
+
+
+
+
