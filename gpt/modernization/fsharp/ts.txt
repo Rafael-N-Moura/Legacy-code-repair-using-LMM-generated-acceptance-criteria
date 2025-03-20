@@ -1,0 +1,694 @@
+Modernize the code to Java Version 17. Make sure the modernized code obeys the requirements outlined by the tests <tests></tests>
+
+
+File 1:
+<phokUi.java>
+import java.awt.*;
+import javax.swing.*;
+import java.awt.event.*;
+import javax.swing.event.*;
+import java.sql.*;
+import java.io.*;
+
+public class PhokUi {
+	static JList artists,albums,tracks;
+	static TextField dir;
+	static Button scan;
+	static String msg;
+	static Connection conn;	
+	static String driver;
+	static String url;
+	static String db;
+	static String user;
+	static String pass;
+	static JScrollPane artistPanel;
+	static JScrollPane albumPanel;
+	static JScrollPane trackPanel;
+	static ResultSet rs;
+	static DefaultListModel artistModel, albumModel, trackModel;
+	static JFrame window;
+	static JLabel status;
+	static Statement populate, popAlbum, popTrack;
+
+	public static void main(String[] args) throws SQLException{
+		try {
+			driver = new String();
+			driver = "com.mysql.jdbc.Driver";
+			url = new String();
+			url = "jdbc:mysql://localhost/";
+			db = new String();
+			db = "music";
+			user = new String();
+			user = "phoku";
+			pass = new String();
+			pass = "phoku";
+			JPanel contentPane = new JPanel();
+			contentPane.setLayout(new FlowLayout());
+			Label title = new Label("*************************************** PhokU Media Library Lister ***************************************",Label.CENTER);
+			contentPane.add(title);
+			dir = new TextField(150);
+			dir.setText("Browse Directory to list");
+			contentPane.add(dir);
+			scan = new Button("Scan");
+			contentPane.add(scan);
+			artistModel = new DefaultListModel();
+			albumModel = new DefaultListModel();
+			trackModel = new DefaultListModel();
+			artists = new JList(artistModel);
+			albums = new JList(albumModel);
+			tracks = new JList(trackModel);
+
+			/* add items dynamically */
+		
+			artistPanel = new JScrollPane(artists);
+			albumPanel = new JScrollPane(albums);
+			trackPanel = new JScrollPane(tracks);
+			artists.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+			albums.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+			tracks.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+			window = new JFrame("PhokU Media Library Manager");
+			artistPanel.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+			artistPanel.setPreferredSize(new Dimension(250, 250));
+			albumPanel.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+			albumPanel.setPreferredSize(new Dimension(250, 250));
+			trackPanel.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+			trackPanel.setPreferredSize(new Dimension(250, 250));
+			contentPane.add(artistPanel);
+			contentPane.add(albumPanel);
+			contentPane.add(trackPanel);
+			status = new JLabel("Idle");
+			contentPane.add(status);
+			window.getContentPane().add(contentPane);
+			Class.forName(driver).newInstance();
+			conn = DriverManager.getConnection(url+db, user, pass);
+			System.out.println("Connection formed");
+			populate = conn.createStatement();
+			popAlbum = conn.createStatement();
+			popTrack = conn.createStatement();
+			scan.addActionListener(new ActionListener() {
+				public void actionPerformed(ActionEvent ae) {
+					System.out.println("Scanning directory...");
+					status.setText("Scanning directory....");
+					try {
+					FileOps oFileOps = new FileOps(dir.getText());
+					rs = populate.executeQuery("select distinct(artist) from main");
+					while (rs.next()) {
+						artistModel.addElement(rs.getString("artist"));
+					}
+					status.setText("Scan complete.");
+					} catch (SQLException e) {System.out.println("SQLException occured in PhokUi");}
+				}
+			});
+			artists.addListSelectionListener(new ListSelectionListener() {
+				public void valueChanged(ListSelectionEvent lse) {
+					try {
+					rs = popAlbum.executeQuery("select distinct(album) from main where artist = '" + artistModel.getElementAt(artists.getSelectedIndex()).toString() + "'");
+					trackModel.clear();
+					albumModel.clear();
+					while (rs.next()) {
+						albumModel.addElement(rs.getString("album"));
+					}
+					} catch (SQLException e) { }
+				}
+			});
+			albums.addListSelectionListener(new ListSelectionListener() {
+				public void valueChanged(ListSelectionEvent lse) {
+					try {
+					rs = popTrack.executeQuery("select track from main where album = '" + albumModel.getElementAt(albums.getSelectedIndex()).toString() + "'");
+					trackModel.clear();
+					while (rs.next()) {
+						trackModel.addElement(rs.getString("track"));
+					}
+					} catch (SQLException e) { }
+				}
+			});
+		}
+		catch (SQLException e) {System.out.println("SQLException caught in PhokUi"); }
+		catch (ClassNotFoundException e) {System.out.println("Class not found"); }
+		catch (Exception e) {System.out.println("Exception Occured in PhokUi"); }
+		window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		window.pack();
+		window.show();
+	}
+}
+</phokUi.java>
+
+File 2:
+<FileOps.java>
+import java.io.*;
+import org.blinkenlights.jid3.*;
+import org.blinkenlights.jid3.v1.*;
+import org.blinkenlights.jid3.v2.*;
+import java.sql.*;
+
+/*************************************************************************************************************************
+ * The file operations class. Scans the user selected directory recursively for media of MP3 type, retrieves the ID3 Tags
+ * and enters the values into the database. 
+ * @author: Saahil
+ * *************************************************************************************************************************/
+
+class FileOps {
+	static Connection conn = null;
+
+	//The constructor. Clears the database, everytime a new parent directory is selected. 
+	FileOps(String path) throws SQLException {
+		String driver = "com.mysql.jdbc.Driver";
+		String url = "jdbc:mysql://localhost/";
+		String db = "music";
+		String user = "phoku";
+		String pass = "phoku";
+
+		try {
+			Class.forName(driver).newInstance();
+			conn = DriverManager.getConnection(url+db, user, pass);
+			Statement stmt = conn.createStatement();
+			stmt.executeUpdate("delete from main");
+			conn.close();
+			getTrackList(path);
+		}
+		catch (Exception e) {}
+	}
+
+
+	// Scans the directory for MP3 files
+	static void getTrackList(String dirPath) throws ID3Exception, IOException, SQLException{
+		MediaFile iMediaFile;
+		String track = new String();
+		String album = new String();
+		String artist = new String();
+		try {
+			File dir = new File(dirPath);
+			if (dir.isDirectory()) {
+				String[] flList = dir.list();
+				int len = flList.length;
+
+				for (int i = 0; i < len; i++) {
+					File f = new File(dirPath + "/" + flList[i]);
+					String fileName = dirPath + "/" + flList[i];
+					if (!f.isDirectory()) {
+						if (fileName.endsWith("mp3")){
+							iMediaFile = new MP3File(f);
+							ID3Tag[] oTags = iMediaFile.getTags();
+							if (oTags[0] instanceof ID3V1_0Tag) {
+								ID3V1_0Tag oActTag = (ID3V1_0Tag)oTags[0];
+								track = oActTag.getTitle();
+								album = oActTag.getAlbum();
+								artist = oActTag.getArtist();
+								insertIntoDb(fileName, track, album, artist);
+							}
+							else if (oTags[0] instanceof ID3V1_1Tag) {
+								ID3V1_1Tag oActTag = (ID3V1_1Tag)oTags[0];
+								track = oActTag.getTitle();
+								album = oActTag.getAlbum();
+								artist = oActTag.getArtist();
+								insertIntoDb(fileName, track, album, artist);
+							}
+						}
+					}
+					// Recursive call if current File object points to a directory
+					else
+						getTrackList(fileName);
+				}
+			}
+			else 
+				throw new FileNotFoundException();
+			
+			}
+		catch (IOException e) {
+			System.out.println("Path doesn't exist or is not a directory");
+		}
+		catch(ID3Exception e) {System.out.println("Other");}
+	}
+	
+	//Populates the database 
+	static void insertIntoDb(String fileName, String track, String album, String artist) throws SQLException  {
+		String url = "jdbc:mysql://localhost/";
+		String dbName = "music";
+		String user = "phoku";
+		String pass = "phoku";
+		String driver = "com.mysql.jdbc.Driver";
+		try {
+			Class.forName(driver);
+			conn = DriverManager.getConnection(url+dbName, user, pass);
+			Statement stmt = conn.createStatement();
+			stmt.executeUpdate("Insert into main values ('" + fileName + "', '" + track + "', '" + album + "', '" + artist + "')");
+			conn.close();
+		}
+		catch(ClassNotFoundException e) {}
+		catch(SQLException e) {}
+		catch(Exception e) {}
+	}
+	
+}
+
+</FileOps.java>
+
+<tests>
+// Example: FileOpsTest.java
+import org.junit.jupiter.api.*;
+import static org.junit.jupiter.api.Assertions.*;
+import java.io.*;
+import java.sql.*;
+
+class FileOpsTest {
+    
+    private File tempDir;
+
+    @BeforeEach
+    void setup() throws IOException {
+        // Create a temporary directory for testing
+        tempDir = new File("tempTestDir");
+        tempDir.mkdir();
+        // Create a dummy MP3 file (could be empty; in real tests, stub MP3File behavior)
+        File dummyMp3 = new File(tempDir, "test.mp3");
+        try (FileWriter writer = new FileWriter(dummyMp3)) {
+            writer.write("dummy content");
+        }
+        // Optionally, set up an in-memory test database (e.g., H2)
+    }
+
+    @AfterEach
+    void tearDown() {
+        // Delete files and directory
+        for (File file : tempDir.listFiles()) {
+            file.delete();
+        }
+        tempDir.delete();
+    }
+
+    @Test
+    void testGetTrackListWithValidDirectory() {
+        // Depending on how you stub the MP3/ID3 functionality,
+        // you might simulate expected metadata.
+        assertDoesNotThrow(() -> FileOps.getTrackList(tempDir.getAbsolutePath()));
+        // After execution, check the database for inserted records.
+        // (Use a test connection to query the table "main")
+    }
+
+    @Test
+    void testGetTrackListWithNonDirectory() {
+        // Provide a path that is not a directory
+        File notADir = new File(tempDir, "test.mp3");
+        // Expect that the method handles it gracefully, e.g., prints error or throws exception.
+        assertThrows(FileNotFoundException.class, () -> FileOps.getTrackList(notADir.getAbsolutePath()));
+    }
+
+    @Test
+    void testInsertIntoDb() throws SQLException {
+        // Configure a test database connection (or use an in-memory DB)
+        // Insert a known record
+        String fileName = "dummy.mp3";
+        String track = "Track1";
+        String album = "Album1";
+        String artist = "Artist1";
+        // This should insert the record without exceptions
+        assertDoesNotThrow(() -> FileOps.insertIntoDb(fileName, track, album, artist));
+        // Query the test database to ensure the record exists
+    }
+}
+java
+Copy
+Edit
+// Example: PhokUiTest.java
+import org.junit.jupiter.api.*;
+import static org.junit.jupiter.api.Assertions.*;
+import javax.swing.*;
+import java.awt.event.*;
+
+class PhokUiTest {
+
+    private PhokUi phokUiInstance;
+
+    @BeforeEach
+    void setup() {
+        // Initialize the UI on the EDT
+        try {
+            SwingUtilities.invokeAndWait(() -> {
+                PhokUi.main(new String[]{});
+            });
+        } catch (Exception e) {
+            fail("Failed to initialize UI");
+        }
+    }
+
+    @Test
+    void testInitialUIState() {
+        // Check that the directory text field has the default text.
+        assertEquals("Browse Directory to list", PhokUi.dir.getText());
+        // Check that the status label initially shows "Idle"
+        assertEquals("Idle", PhokUi.status.getText());
+        // The list models should be empty
+        assertEquals(0, PhokUi.artistModel.size());
+        assertEquals(0, PhokUi.albumModel.size());
+        assertEquals(0, PhokUi.trackModel.size());
+    }
+
+    @Test
+    void testScanButtonAction() throws Exception {
+        // Simulate setting a directory in the text field
+        SwingUtilities.invokeAndWait(() -> {
+            PhokUi.dir.setText("tempTestDir"); // assuming this is set up for testing
+        });
+        // Simulate button click
+        SwingUtilities.invokeAndWait(() -> {
+            for (ActionListener al : PhokUi.scan.getActionListeners()) {
+                al.actionPerformed(new ActionEvent(PhokUi.scan, ActionEvent.ACTION_PERFORMED, "Scan"));
+            }
+        });
+        // Wait or poll until the scan is complete, then check:
+        SwingUtilities.invokeAndWait(() -> {
+            // Check that status label has been updated
+            assertEquals("Scan complete.", PhokUi.status.getText());
+            // Verify that artistModel is populated (depending on test DB state)
+            assertTrue(PhokUi.artistModel.getSize() > 0);
+        });
+    }
+
+    @Test
+    void testArtistListSelection() throws Exception {
+        // Pre-populate the artistModel with test data (or assume scan has done so)
+        SwingUtilities.invokeAndWait(() -> {
+            PhokUi.artistModel.addElement("TestArtist");
+        });
+        // Simulate artist selection:
+        SwingUtilities.invokeAndWait(() -> {
+            PhokUi.artists.setSelectedIndex(0);
+            // Manually fire list selection event if needed.
+        });
+        // Now, albumModel should be updated according to the query.
+        // For a complete test, ensure that the test DB has corresponding album data for "TestArtist"
+    }
+
+    @Test
+    void testAlbumListSelection() throws Exception {
+        // Pre-populate albumModel with test data
+        SwingUtilities.invokeAndWait(() -> {
+            PhokUi.albumModel.addElement("TestAlbum");
+        });
+        // Simulate album selection:
+        SwingUtilities.invokeAndWait(() -> {
+            PhokUi.albums.setSelectedIndex(0);
+        });
+        // Now, trackModel should be updated according to the query.
+        // Verify expected track(s) appear given test DB state.
+    }
+}
+</tests>
+ChatGPT said:
+Reasoned for 4 seconds
+Alright, time to modernize the code to Java 17. The existing code includes two classes: PhokUi.java and FileOps.java. We’ll need to update the code style, exception handling, and adopt try-with-resources for database connections. I’ll also replace anonymous inner classes with lambda expressions for event listeners where possible. I'll switch to setVisible(true) instead of the deprecated show() method. And I should keep compatibility with the test code, which uses public static variables.
+
+Below are the modernized versions of both files. The changes include:
+
+Using Java 17 features: such as the var keyword where appropriate.
+Leveraging try-with-resources: for auto‐closing database resources.
+Replacing anonymous inner classes with lambda expressions: for event listeners.
+Using generics in Swing components: to avoid raw types.
+Replacing deprecated calls: such as window.show() with setVisible(true).
+Feel free to adjust any connection details or libraries as needed for your environment.
+
+<phokUi.java>
+
+java
+Copy
+Edit
+import java.awt.*;
+import javax.swing.*;
+import java.awt.event.*;
+import javax.swing.event.*;
+import java.sql.*;
+
+public class PhokUi {
+    // Swing UI components declared as public static for tests
+    public static JList<String> artists, albums, tracks;
+    public static TextField dir;
+    public static Button scan;
+    public static String msg;
+    public static Connection conn;
+    public static String driver;
+    public static String url;
+    public static String db;
+    public static String user;
+    public static String pass;
+    public static JScrollPane artistPanel;
+    public static JScrollPane albumPanel;
+    public static JScrollPane trackPanel;
+    public static ResultSet rs;
+    public static DefaultListModel<String> artistModel, albumModel, trackModel;
+    public static JFrame window;
+    public static JLabel status;
+    public static Statement populate, popAlbum, popTrack;
+
+    public static void main(String[] args) {
+        try {
+            // Initialize connection settings
+            driver = "com.mysql.jdbc.Driver";
+            url = "jdbc:mysql://localhost/";
+            db = "music";
+            user = "phoku";
+            pass = "phoku";
+
+            // Build the UI
+            var contentPane = new JPanel(new FlowLayout());
+            var title = new Label("*************************************** PhokU Media Library Lister ***************************************", Label.CENTER);
+            contentPane.add(title);
+            dir = new TextField(150);
+            dir.setText("Browse Directory to list");
+            contentPane.add(dir);
+            scan = new Button("Scan");
+            contentPane.add(scan);
+            
+            // Use generics for list models
+            artistModel = new DefaultListModel<>();
+            albumModel = new DefaultListModel<>();
+            trackModel = new DefaultListModel<>();
+            artists = new JList<>(artistModel);
+            albums = new JList<>(albumModel);
+            tracks = new JList<>(trackModel);
+
+            // Add dynamic items (lists) with scroll panes
+            artistPanel = new JScrollPane(artists);
+            albumPanel = new JScrollPane(albums);
+            trackPanel = new JScrollPane(tracks);
+            artists.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            albums.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            tracks.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            window = new JFrame("PhokU Media Library Manager");
+            artistPanel.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+            artistPanel.setPreferredSize(new Dimension(250, 250));
+            albumPanel.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+            albumPanel.setPreferredSize(new Dimension(250, 250));
+            trackPanel.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+            trackPanel.setPreferredSize(new Dimension(250, 250));
+            contentPane.add(artistPanel);
+            contentPane.add(albumPanel);
+            contentPane.add(trackPanel);
+            status = new JLabel("Idle");
+            contentPane.add(status);
+            window.getContentPane().add(contentPane);
+
+            // Load the database driver and create a connection
+            Class.forName(driver);
+            conn = DriverManager.getConnection(url + db, user, pass);
+            System.out.println("Connection formed");
+            populate = conn.createStatement();
+            popAlbum = conn.createStatement();
+            popTrack = conn.createStatement();
+
+            // Scan button action using lambda
+            scan.addActionListener(e -> {
+                System.out.println("Scanning directory...");
+                status.setText("Scanning directory....");
+                try {
+                    // Create new FileOps instance which will clear the database and scan directory
+                    new FileOps(dir.getText());
+                    try (ResultSet rs = populate.executeQuery("select distinct(artist) from main")) {
+                        while (rs.next()) {
+                            artistModel.addElement(rs.getString("artist"));
+                        }
+                    }
+                    status.setText("Scan complete.");
+                } catch (SQLException ex) {
+                    System.out.println("SQLException occurred in PhokUi: " + ex.getMessage());
+                }
+            });
+
+            // Artist list selection listener using lambda
+            artists.addListSelectionListener(e -> {
+                if (!e.getValueIsAdjusting() && artists.getSelectedIndex() != -1) {
+                    try {
+                        String selectedArtist = artistModel.getElementAt(artists.getSelectedIndex());
+                        // Clear previous album and track models
+                        albumModel.clear();
+                        trackModel.clear();
+                        try (ResultSet rs = popAlbum.executeQuery(
+                                "select distinct(album) from main where artist = '" + selectedArtist + "'")) {
+                            while (rs.next()) {
+                                albumModel.addElement(rs.getString("album"));
+                            }
+                        }
+                    } catch (SQLException ex) {
+                        System.out.println("SQLException in artist selection: " + ex.getMessage());
+                    }
+                }
+            });
+
+            // Album list selection listener using lambda
+            albums.addListSelectionListener(e -> {
+                if (!e.getValueIsAdjusting() && albums.getSelectedIndex() != -1) {
+                    try {
+                        String selectedAlbum = albumModel.getElementAt(albums.getSelectedIndex());
+                        // Clear previous track model
+                        trackModel.clear();
+                        try (ResultSet rs = popTrack.executeQuery(
+                                "select track from main where album = '" + selectedAlbum + "'")) {
+                            while (rs.next()) {
+                                trackModel.addElement(rs.getString("track"));
+                            }
+                        }
+                    } catch (SQLException ex) {
+                        System.out.println("SQLException in album selection: " + ex.getMessage());
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            System.out.println("SQLException caught in PhokUi: " + e.getMessage());
+        } catch (ClassNotFoundException e) {
+            System.out.println("Class not found: " + e.getMessage());
+        } catch (Exception e) {
+            System.out.println("Exception occurred in PhokUi: " + e.getMessage());
+        }
+        window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        window.pack();
+        window.setVisible(true);
+    }
+}
+<FileOps.java>
+
+java
+Copy
+Edit
+import java.io.*;
+import org.blinkenlights.jid3.*;
+import org.blinkenlights.jid3.v1.*;
+import org.blinkenlights.jid3.v2.*;
+import java.sql.*;
+
+/*************************************************************************************************************************
+ * The file operations class. Scans the user selected directory recursively for MP3 type media,
+ * retrieves the ID3 Tags and enters the values into the database. 
+ * Modernized to Java 17.
+ * @author: Saahil
+ *************************************************************************************************************************/
+public class FileOps {
+    // No longer storing a static connection since we use try-with-resources
+    public FileOps(String path) throws SQLException {
+        // Database connection settings
+        var driver = "com.mysql.jdbc.Driver";
+        var url = "jdbc:mysql://localhost/";
+        var db = "music";
+        var user = "phoku";
+        var pass = "phoku";
+
+        try {
+            Class.forName(driver);
+            // Clear the database before scanning new directory
+            try (Connection conn = DriverManager.getConnection(url + db, user, pass);
+                 Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("delete from main");
+            }
+            // Start scanning for tracks
+            getTrackList(path);
+        } catch (Exception e) {
+            System.out.println("Exception in FileOps constructor: " + e.getMessage());
+        }
+    }
+
+    // Scans the directory for MP3 files recursively.
+    public static void getTrackList(String dirPath) throws ID3Exception, IOException, SQLException {
+        try {
+            File dir = new File(dirPath);
+            if (dir.isDirectory()) {
+                String[] flList = dir.list();
+                if (flList != null) {
+                    for (String fileName : flList) {
+                        File f = new File(dir, fileName);
+                        String fullPath = dir.getAbsolutePath() + File.separator + fileName;
+                        if (f.isDirectory()) {
+                            // Recursive call if current File object points to a directory
+                            getTrackList(fullPath);
+                        } else {
+                            if (fullPath.toLowerCase().endsWith("mp3")) {
+                                MediaFile iMediaFile = new MP3File(f);
+                                ID3Tag[] oTags = iMediaFile.getTags();
+                                String track = "";
+                                String album = "";
+                                String artist = "";
+                                if (oTags.length > 0) {
+                                    if (oTags[0] instanceof ID3V1_0Tag) {
+                                        var oActTag = (ID3V1_0Tag) oTags[0];
+                                        track = oActTag.getTitle();
+                                        album = oActTag.getAlbum();
+                                        artist = oActTag.getArtist();
+                                        insertIntoDb(fullPath, track, album, artist);
+                                    } else if (oTags[0] instanceof ID3V1_1Tag) {
+                                        var oActTag = (ID3V1_1Tag) oTags[0];
+                                        track = oActTag.getTitle();
+                                        album = oActTag.getAlbum();
+                                        artist = oActTag.getArtist();
+                                        insertIntoDb(fullPath, track, album, artist);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                throw new FileNotFoundException("Path is not a directory: " + dirPath);
+            }
+        } catch (IOException e) {
+            System.out.println("Path doesn't exist or is not a directory: " + e.getMessage());
+            throw e;
+        } catch (ID3Exception e) {
+            System.out.println("ID3Exception encountered: " + e.getMessage());
+            throw e;
+        }
+    }
+
+    // Inserts a record into the database using try-with-resources.
+    public static void insertIntoDb(String fileName, String track, String album, String artist) throws SQLException {
+        var url = "jdbc:mysql://localhost/";
+        var dbName = "music";
+        var user = "phoku";
+        var pass = "phoku";
+        var driver = "com.mysql.jdbc.Driver";
+        try {
+            Class.forName(driver);
+            try (Connection conn = DriverManager.getConnection(url + dbName, user, pass);
+                 Statement stmt = conn.createStatement()) {
+                String query = "INSERT INTO main VALUES ('" + fileName + "', '" + track + "', '" + album + "', '" + artist + "')";
+                stmt.executeUpdate(query);
+            }
+        } catch (ClassNotFoundException e) {
+            System.out.println("Database driver class not found: " + e.getMessage());
+        } catch (SQLException e) {
+            System.out.println("SQLException in insertIntoDb: " + e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            System.out.println("Exception in insertIntoDb: " + e.getMessage());
+        }
+    }
+}
+Explanation
+UI Modernization (PhokUi.java):
+
+Lambda Expressions: Replaces anonymous classes for ActionListener and ListSelectionListener.
+Generics: JList<String> and DefaultListModel<String> now include type parameters.
+Resource Management: Although the connection is kept as a static field for compatibility with tests, individual result sets are handled using try-with-resources.
+Deprecated Methods: Replaced window.show() with window.setVisible(true).
+Database & File Handling Modernization (FileOps.java):
+
+Try-With-Resources: Ensures database connections and statements are closed properly.
+Recursive Directory Traversal: Uses enhanced for-loops and proper file separators.
+Error Reporting: Exceptions are printed with their messages for easier debugging.
+These changes should meet the requirements specified by the tests while using modern Java 17 practices.

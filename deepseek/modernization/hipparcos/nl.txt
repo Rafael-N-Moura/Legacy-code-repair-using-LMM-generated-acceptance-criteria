@@ -1,0 +1,2220 @@
+Modernize the code to Java Version 17. Make sure the modernized code obeys the requirements outlined by the tests <tests></tests>
+File 1:
+<Dpoint.java>
+
+/*
+* Copyright (C) 1997-2016 European Space Agency
+*
+* This library is free software; you can redistribute it and/or
+* modify it under the terms of the GNU Lesser General Public
+* License as published by the Free Software Foundation; either
+* version 2.1 of the License, or (at your option) any later version.
+*
+* This library is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+* Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public
+* License along with this library; if not, write to the Free Software
+* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+package hipparcos.plot;
+
+public class DPoint {
+   private double x=0, y=0;
+   private boolean valid;
+   private boolean semivalid;
+
+   public DPoint(double x, double y) {
+	valid=true;
+	semivalid=true;
+	this.x=x;
+	this.y=y;
+   }
+
+   public DPoint(DPoint p) {
+	valid=true;
+	semivalid=true;
+	this.x=p.getX();
+	this.y=p.getY();
+   }
+
+   public DPoint() {
+	valid=false;
+	semivalid=false;
+   }
+
+   public boolean isValid() { return valid; };
+
+   public double getX() {
+     return x ;  
+// should throw an exception here if !valid ...
+   }
+
+   public double getY() {
+      return y;
+   }
+
+   public void setX(double x) {
+      this.x= x;
+      semiValidate(); 
+   }
+
+   public void setY(double y) {
+      this.y= y;
+      semiValidate(); 
+   }
+
+   private void semiValidate() {
+	if (!valid) {
+	   valid=semivalid;
+	   semivalid= true;
+	}
+   }
+
+   public String toString() {
+	return (""+x+"  "+y);
+   }
+}
+</Dpoint.java>
+
+File 2:
+<Histogram.java>
+
+/*
+* Copyright (C) 1997-2016 European Space Agency
+*
+* This library is free software; you can redistribute it and/or
+* modify it under the terms of the GNU Lesser General Public
+* License as published by the Free Software Foundation; either
+* version 2.1 of the License, or (at your option) any later version.
+*
+* This library is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+* Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public
+* License along with this library; if not, write to the Free Software
+* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+package hipparcos.plot;
+import java.awt.*;
+
+public class Histogram extends Plot {
+
+   private int occurences[];
+   private boolean gotOne=false;
+   private Color plotcol;
+
+   public Histogram(String xlabel, String ylabel, int low,int high, 
+				double step, Color col) {
+	setXlabel(xlabel);
+	setYlabel(ylabel);
+	plotcol=col;
+	init (low, high,step);
+   }
+
+   public void resetGraph() {
+	miny=0;
+	maxy=10;
+	if (occurences != null) {
+	   for (int i = 0; i < occurences.length; i++) {
+		occurences[i]=0;
+	   };
+	};
+   }
+
+   public void init(int low,int high, double step) {
+	gotOne=false;
+	minx=low;
+	maxx=high;
+	miny=0;
+	maxy=10;
+	xstep=step;
+	numberStep=5;
+	/* we will then split the data in to these groups
+	   which we can just keep in array only interestedin how many
+	*/
+	Double nogrps= new Double ((high - low)/ step);
+	occurences=new int[nogrps.intValue()];
+   } 
+
+   public void addOccurence (double o) {
+	gotOne=true;
+	int which=0;
+	double category=minx+xstep;
+	while ((category < o) && (category < maxx)) {
+		category = category+xstep;
+		which++;
+	}
+	//System.out.println("o "+o+" "+occurences.length);
+	while  (which >= occurences.length) which--; // off the end
+	occurences[which]++; //add one to ocurences for this);
+	// which may cause us to have to many !!
+	if (occurences[which] > maxy) {
+	   maxy=occurences[which];
+	   ystep=-1;
+	}
+	repaint();
+		
+   }
+
+   public void plotGraph(Graphics g) {
+      if (gotOne) {
+        g.setColor(plotcol);
+	double categ=minx;
+	for (int i=0; i< occurences.length; i++ ) {
+	    plotBar(categ,occurences[i],g);
+	    categ+=xstep;
+	}	
+      } else {
+        g.setColor(Color.red);
+        g.drawString(" No data",30,(int)(this.getSize().height/2));
+      };
+   }
+ 
+   public void plotBar(double cat, int height, Graphics g){
+	int x = calcX(cat);
+	int w = calcX(cat+xstep) - x;
+	int y = calcY(height);
+	int h = calcY(miny) -y ;
+	g.fillRect(x,y,w,h);
+	//System.out.println("x "+x+" y "+y+" w "+w+" h "+h);
+   }
+}
+</Histogram.java>
+
+File 3:
+<PhasePlot.java>
+
+/*
+* Copyright (C) 1997-2016 European Space Agency
+*
+* This library is free software; you can redistribute it and/or
+* modify it under the terms of the GNU Lesser General Public
+* License as published by the Free Software Foundation; either
+* version 2.1 of the License, or (at your option) any later version.
+*
+* This library is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+* Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public
+* License along with this library; if not, write to the Free Software
+* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+package hipparcos.plot;
+
+import java.awt.*;
+import java.lang.*;
+import java.util.*;
+
+
+/** Same as a simple plot but take in a phase */
+public class PhasePlot extends SimplePlot {
+
+   private double phase;
+
+   public PhasePlot(String xlabel, String ylabel, double lowY, double highY, Color col) {
+	super (xlabel,ylabel,0,1.5,lowY,highY,col);
+	xstep=0.1;
+	numberStep=1;
+  	phase=0.5;
+   }
+
+   public void resetGraph() {
+	super.resetGraph();
+	xstep=0.5;
+	numberStep=1;
+   }
+
+   public void plotGraph(Graphics g) {
+      if (gotOne) {
+	if (plotZeroLine) plotZero(g);
+        g.setColor(plotcol);
+        for (Enumeration e = points.elements() ; e.hasMoreElements() ;) {
+                DPoint op = (DPoint)e.nextElement() ;
+                DPoint p = new DPoint(op) ;
+		double x = ((p.getX()%phase) *(1/phase));
+		p.setX(x);
+		plotPoint(p,g);
+		if (p.getX() <= 0.5) { // plot some points again on the end
+		   p.setX(p.getX()+1);
+		   plotPoint(p,g);
+		}
+        }
+
+      } else {
+        g.setColor(Color.red);
+        g.drawString(" No data",30,(int)(this.getSize().height/2));
+      };
+   }
+
+   public void setPhase(double phase) {
+      this.phase = phase;
+      repaint();
+  } 
+
+  public double getPhase() {
+	return phase;
+  }
+}
+</PhasePlot.java>
+
+File 4:
+<Plot.java>
+
+/*
+* Copyright (C) 1997-2016 European Space Agency
+*
+* This library is free software; you can redistribute it and/or
+* modify it under the terms of the GNU Lesser General Public
+* License as published by the Free Software Foundation; either
+* version 2.1 of the License, or (at your option) any later version.
+*
+* This library is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+* Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public
+* License along with this library; if not, write to the Free Software
+* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+package hipparcos.plot;
+
+import java.awt.*;
+import java.io.*;
+import java.util.*;
+
+/** Plot just with axes and scale as base class for other plots
+    like Histogram  **/
+public class Plot extends Canvas {
+
+  double scaleX,scaleY; 
+  public double minx,miny,maxx,maxy;
+  public int topRule,bottomRule,leftRule,rightRule,dheight;
+  public  int ystep=-1,numberStep=5,ynumberStep=5;
+  public double xstep=-1; 
+  public int pointSize=4;
+  private String botText,leftText;
+  private boolean inited=false;
+
+  private void init() {
+	topRule=20;
+ 	bottomRule=30;
+ 	rightRule=20;
+	leftRule=25;	
+ 	setBackground(Color.white);
+	minx=0;
+	maxx=10;
+	miny=0;
+	maxy=10;
+	botText=new String ("X axis");
+	leftText=new String ("Y axis");
+	inited=true;
+  }
+
+  public Plot () {
+	init();
+  }
+
+  public void setScales() {
+    Dimension d = this.getSize();
+    int gWidth = (int) d.width  - leftRule - rightRule ;
+    int gHeight = (int) d.height -  bottomRule -topRule;
+    dheight=gHeight;
+    scaleX= (maxx - minx)/gWidth;
+    scaleY= (maxy - miny)/gHeight;
+    if (xstep<=-1) {xstep=getStep(scaleX); numberStep=getNumberStep(scaleX);}
+    if (ystep==-1) {ystep=getStep(scaleY); ynumberStep=getNumberStep(scaleY);}
+    //System.out.println (" ScaleX "+scaleX+" ScaleY "+scaleY +" Height "+dheight);
+  }
+
+  public int getStep(double scale) {
+  /** how often to put a tick mark depending on scale */
+     int ret=1;
+     if (scale <= 2 ) {ret=50;  };
+     if (scale <= 1 ) {ret=10 ;};
+     if (scale < .1 ) {ret=1 ;};
+     return ret;
+  }
+
+ public int getNumberStep(double scale) {
+     int ret=1;
+     if (scale <= 2 ) {ret=50;  };
+     if (scale <= 1 ) {ret=10 ; };
+     if (scale < .1 ) {ret=5 ;};
+     return ret;
+ }
+  public void paint (Graphics g) {
+
+	if (!inited) init();
+	drawRulers(g);
+	plotGraph(g);
+  }
+
+public void plotGraph( Graphics g) {
+/** Override this one in subclasses to do your thing*/
+	g.setColor(Color.red);
+	g.drawString(" Not Implemented",30,(int)(this.getSize().height/2));
+}
+  
+public int calcX(double d) {
+	Double ret=new Double(leftRule+((d - minx)/scaleX));
+	return ( ret.intValue() );
+} 
+public int calcY(double d) {
+	Double ret=new Double((d- miny)/scaleY);
+	return ( topRule + dheight - ret.intValue() );
+} 
+
+private void drawRulers (Graphics g)  {
+     String ly,hy,st;
+     int cShift=9;
+     int highY,lowY,lowX,highX,tick;
+     double dtick;
+     int posLowY,posHighY,step,posLowX,posHighX;
+
+     setScales();
+
+     Float stF;
+   // ystuff
+     stF = new Float(maxy + (maxy%ystep));
+     highY =  stF.intValue();
+     stF = new Float(miny - (miny%ystep));
+     lowY = stF.intValue();
+     posHighY= calcY(highY) + (cShift/2);
+     posLowY= calcY(lowY) + (cShift/2);
+//System.out.println("Min Y "+miny+" lowY "+lowY +" PoslowY "+posLowY);
+//System.out.println("Max Y "+maxy+" highY "+highY +" posHighY "+posHighY);
+    // x stuff
+     stF = new Float(maxx - (maxx%xstep));
+     highX = stF.intValue();
+     stF = new Float(minx  - (minx%xstep));
+     lowX = stF.intValue();
+     posHighX=  calcX(highX) -(cShift/2);
+     posLowX= calcX(lowX) - cShift;
+     // X and Y axis and Scale (Netscape seems to have a big problem
+     // with strings hence the rather over kill appraoch here
+     g.setColor(Color.black);
+     g.drawString(leftText,1,12);
+     Dimension d = this.getSize();
+     Double center= new Double ((d.width/2) - ((botText.length()/2)*7));
+     g.drawString(botText,center.intValue(),d.height - (cShift/2));
+     g.drawLine (leftRule-1,topRule,leftRule-1,d.height-bottomRule);
+     g.drawLine (leftRule-1,d.height-bottomRule,d.width-rightRule,d.height-bottomRule);
+
+     tick = lowY - (lowY%ystep);
+     int endTick = highY - (highY%ystep); 
+     while (tick <= endTick) {
+         int posTick= calcY(tick);
+	 g.drawLine(leftRule-5,posTick, leftRule,posTick);
+	 if (tick%ynumberStep==0) g.drawString(""+tick,3,(posTick+(cShift/2)));
+	 tick+=ystep;
+     }
+
+     // ticks on X
+     dtick = lowX - (lowX%xstep);
+     endTick = (int) (highX - (highX%xstep)); 
+     while (dtick <= endTick) {
+         int posTick= calcX(dtick);
+	 g.drawLine(posTick,(d.height -bottomRule), posTick, (d.height -bottomRule +5));
+	 if (dtick%numberStep==0) {
+	     Double t = new Double (dtick);
+	     g.drawString(""+t.intValue(),(posTick-(cShift/2)),(d.height - 14));
+	 }
+	 dtick+=xstep;
+     }
+}
+
+public void setXlabel(String l) {
+   botText=l;
+}
+public void setYlabel(String l) {
+   leftText=l;
+}
+
+   public void plotPoint(double rx, double ry, Graphics g){
+        int x = calcX(rx);
+        int y = calcY(ry);
+	//System.out.println("Plotting "+x+", "+y);
+	Double offd = new Double(pointSize/2);
+	int off = offd.intValue();
+	g.fillOval((x-off),(y-off),pointSize,pointSize);
+   }
+
+   public void plotPoint(DPoint p, Graphics g){
+        plotPoint(p.getX(),p.getY(),g);
+   }
+
+}
+</Plot.java>
+
+File 5:
+<SimplePlot.java>
+
+/*
+* Copyright (C) 1997-2016 European Space Agency
+*
+* This library is free software; you can redistribute it and/or
+* modify it under the terms of the GNU Lesser General Public
+* License as published by the Free Software Foundation; either
+* version 2.1 of the License, or (at your option) any later version.
+*
+* This library is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+* Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public
+* License along with this library; if not, write to the Free Software
+* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+package hipparcos.plot;
+
+import java.awt.*;
+import java.lang.*;
+import java.util.*;
+
+/* Just plots points on a grpah - nothing fancy. Need to supply the 
+   max and min when setting up */
+public class SimplePlot extends Plot {
+
+   public Vector points;
+   public boolean gotOne=false;
+   public Color plotcol;
+   public boolean plotZeroLine=true;
+   static public Color zeroLineColor=new Color(255,105,255);
+
+   public SimplePlot(String xlabel, String ylabel, double lowX,double highX, 
+	double lowY, double highY, Color col) {
+	setXlabel(xlabel);
+	setYlabel(ylabel);
+	plotcol=col;
+	init (lowX, highX, lowY, highY);
+   }
+
+   public void resetGraph() {
+	points=new Vector();
+   }
+
+   public void init(double lowX,double highX, double lowY, double highY) {
+	gotOne=false;
+	minx=lowX;
+	maxx=highX;
+	miny=lowY;
+	maxy=highY;
+	xstep=1;
+	ystep=1;
+	numberStep=1;
+	ynumberStep=5;
+	points=new Vector();
+   } 
+
+   public void addPoint (DPoint p ) {
+	gotOne=true;
+	if (points != null) points.addElement(p);
+	repaint();
+   }
+
+   public void plotGraph(Graphics g) {
+      if (gotOne && (points != null)) {
+	if (plotZeroLine) plotZero(g);
+        g.setColor(plotcol);
+        for (Enumeration e = points.elements() ; e.hasMoreElements() ;) {
+                DPoint p = (DPoint)e.nextElement() ;
+		plotPoint(p,g);
+        }
+
+      } else {
+        g.setColor(Color.red);
+        g.drawString(" No data",30,(int)(this.getSize().height/2));
+      };
+   }
+
+   public void plotZero( Graphics g) {
+	int y1= calcY(0);
+	int x1= calcX(minx);
+	int y2= y1;
+	int x2= calcX(maxx);
+	int xi= calcX(minx);
+	g.setColor(zeroLineColor);
+	g.drawLine(x1,y1,x2,y2);
+   } 
+}
+</SimplePlot.java>
+
+
+<tests>
+1. DPoint Class Tests
+Scenario 1.1: Default Constructor Initialization
+Input: new DPoint()
+
+Expected Output:
+
+isValid() returns false.
+
+getX() and getY() return 0.0.
+
+semivalid is false.
+
+Scenario 1.2: Parameterized Constructor Validity
+Input: new DPoint(3.5, 4.2)
+
+Expected Output:
+
+isValid() returns true.
+
+getX() returns 3.5, getY() returns 4.2.
+
+semivalid is true.
+
+Scenario 1.3: Copy Constructor Behavior
+Input: Copy an invalid DPoint (created via default constructor).
+
+Steps:
+
+DPoint invalidPoint = new DPoint();
+
+DPoint copiedPoint = new DPoint(invalidPoint);
+
+Expected Output:
+
+copiedPoint.isValid() returns true (copy constructor forces validity).
+
+copiedPoint.getX()/getY() match the original’s values (likely 0.0).
+
+Scenario 1.4: Setters and Validity Transitions
+Steps:
+
+Create a default DPoint (invalid).
+
+Call setX(5.0).
+
+Verify valid remains false, semivalid becomes true.
+
+Call setY(7.0).
+
+Expected Output:
+
+After setY, valid becomes true (both setters invoked).
+
+Scenario 1.5: Invalid Point Getters
+Input: Use a default-constructed DPoint.
+
+Expected Output:
+
+getX() and getY() return 0.0 without exceptions (code does not throw errors as per current implementation).
+
+2. Histogram Class Tests
+Scenario 2.1: Initialization of Bins
+Input: init(0, 10, 2.0) (5 bins: [0-2), [2-4), ..., [8-10]).
+
+Expected Output:
+
+occurences.length is 5.
+
+Scenario 2.2: Adding Values to Bins
+Steps:
+
+Add 3.0 to a histogram with low=0, high=10, step=2.0.
+
+Add 9.5 (edge case).
+
+Expected Output:
+
+3.0 increments bin 1 (covers 2-4).
+
+9.5 increments bin 4 (covers 8-10).
+
+Scenario 2.3: Out-of-Range Values
+Steps:
+
+Add -1.0 (below minx).
+
+Add 15.0 (above maxx).
+
+Expected Output:
+
+Both values are clamped to bin 0 and the last bin, respectively.
+
+Scenario 2.4: MaxY Update
+Steps:
+
+Add 5.0 to a bin.
+
+Verify maxy increases to match the bin’s count.
+
+Expected Output:
+
+maxy updates dynamically to reflect the highest bin count.
+
+3. PhasePlot Class Tests
+Scenario 3.1: Wrapping Points with Default Phase (0.5)
+Steps:
+
+Add a point with x=0.3.
+
+Plot with phase=0.5.
+
+Expected Output:
+
+Transformed x = (0.3 % 0.5) * 2 = 0.6.
+
+No duplicate point (since 0.6 > 0.5).
+
+Scenario 3.2: Duplicate Points for Wrapped Values
+Steps:
+
+Add a point with x=0.2.
+
+Plot with phase=0.5.
+
+Expected Output:
+
+Transformed x = (0.2 % 0.5) * 2 = 0.4.
+
+Duplicate point plotted at x=1.4.
+
+Scenario 3.3: Phase Adjustment
+Steps:
+
+Set phase=1.0.
+
+Add x=1.5.
+
+Expected Output:
+
+Transformed x = (1.5 % 1.0) * 1 = 0.5.
+
+Duplicate point at x=1.5.
+
+4. Plot and SimplePlot Class Tests
+Scenario 4.1: Coordinate Conversion Accuracy
+Input: calcX(5.0) and calcY(5.0) with minx=0, maxx=10, miny=0, maxy=10, and a 200x200 canvas.
+
+Expected Output:
+
+calcX(5.0) returns midpoint of the graph area (e.g., leftRule + (width / 2)).
+
+calcY(5.0) returns midpoint vertically.
+
+Scenario 4.2: Empty Data Handling
+Steps: Plot with no points added.
+
+Expected Output:
+
+“No data” message displayed in red.
+
+Scenario 4.3: Zero Line Plotting
+Steps: Enable plotZeroLine and add points.
+
+Expected Output:
+
+A pink line drawn at y=0.
+
+5. Edge Cases and Error Handling
+Scenario 5.1: Invalid DPoint in SimplePlot
+Steps: Add an invalid DPoint (default constructor) to SimplePlot.
+
+Expected Output:
+
+Point plotted at (0.0, 0.0) despite being invalid (no exception thrown).
+
+Scenario 5.2: Negative Steps in Histogram
+Input: Initialize Histogram with low=10, high=0 (invalid range).
+
+Expected Output:
+
+Graceful handling (e.g., empty bins or exception, depending on code resilience).
+
+6. Integration Tests
+Scenario 6.1: Full Workflow for Histogram
+Steps:
+
+Initialize Histogram with low=0, high=10, step=2.
+
+Add values [1.0, 3.0, 7.0, 11.0].
+
+Render.
+
+Expected Output:
+
+Bins [0-2), [2-4), [6-8) incremented by 1, 1, 1.
+
+11.0 clamped to last bin.
+
+Scenario 6.2: PhasePlot with Dynamic Phase
+Steps:
+
+Add points at x=0.25, 0.75.
+
+Adjust phase from 0.5 to 1.0.
+
+Expected Output:
+
+Initial render: Points wrapped to 0.5 and 1.5 (duplicated).
+
+After phase change: Points wrapped modulo 1.0.
+
+7. Performance and UI Tests
+Render Speed: Verify rendering with 10,000 points does not lag.
+
+Resize Handling: Check axis recalculation on canvas resize.
+
+Thread Safety: Ensure addOccurence and repaint() work in multi-threaded contexts.
+
+</tests>
+Okay, I need to modernize the given Java code to version 17 while ensuring it passes the outlined tests. Let's start by looking at each file and identifying areas that can be updated.
+
+First, DPoint.java. The class has some old practices. For example, the use of Double and Integer constructors is deprecated. Java 5 introduced autoboxing, but in Java 9+, these constructors are deprecated. So, I should replace new Double(...) with Double.valueOf(...) or just parse where possible. Also, check if any code can use records or other modern features. However, DPoint has mutable state with setters, so a record might not be suitable. Instead, maybe use getters and make fields final if possible. Wait, but the setters modify x and y, so the fields can't be final. So no record here.
+
+Wait, in DPoint's constructors, when copying, it uses getX() and getY(), which return the values even if the original is invalid. But according to the tests, the copy constructor forces validity. So when you copy an invalid DPoint, the new one becomes valid. That's part of the existing logic.
+
+Next, the toString method can be simplified using String.format or a more concise approach. Also, check for any code style issues, like redundant semicolons after method declarations. For example, isValid() has a semicolon after the method, which is allowed but unnecessary. Let's remove that.
+
+In Histogram.java, the line Double nogrps = new Double(...) should be replaced with Double.valueOf or even better, use (int) Math.ceil((high - low)/step), but wait, the original code creates an array of size (high - low)/step. But if high and low are integers and step is a double, there might be rounding issues. But the original code uses Double nogrps = new Double((high - low)/step); then takes intValue(), which truncates. So maybe replace that line with occurences = new int[(int) ((high - low)/step)]; using casting. However, in Java 17, using new Double is deprecated, so Double.valueOf is better. Wait, but the code actually can be simplified by casting directly to int. So change Double nogrps = new Double(...) to int nogrps = (int) ((high - low)/step); and then occurences = new int[nogrps];. That would avoid the deprecated constructor.
+
+Also, in addOccurence, the while loop that decrements which if it's beyond the array. The test case 2.3 expects out-of-range values to clamp to the first or last bin. Let me check the code: while (which >= occurences.length) which--;. If o is higher than maxx, which could be beyond occurences.length -1. For example, if o is 10.5, and maxx is 10, step is 2, then (10-0)/2=5 bins (0-2, 2-4, etc.). So category starts at minx + xstep (0+2=2). Then increments until category >= o. For o=10.5, category would go to 2,4,6,8,10,12. So which increments 5 times (since initial category is 2, and each step adds xstep=2). So which would be 5, but the array length is 5 (indices 0-4). So which becomes 5, which is >= 5 (occurences.length), so which-- makes it 4. So it's clamped to the last bin. That's correct. So the code seems okay here.
+
+Now, for Java 17 features: switch to enhanced for loops where possible. For example, in Histogram's resetGraph, the for loop uses a traditional loop. Since Java 5, we can loop over arrays with for-each, but since we're setting each element to 0, we need the index. So maybe leave as is. But in plotGraph, the loop for (int i=0; i < occurences.length; i++) can be replaced with a for-each if we track the index. But categ is tracked as a running variable, so perhaps not. So maybe no change here.
+
+In PhasePlot.java, the use of Enumeration is outdated. Java 1.2 introduced Collections, and it's better to use Iterator or enhanced for loops. But the code uses points.elements() which returns an Enumeration. In SimplePlot, points is a Vector, which is synchronized and part of legacy code. Modernizing would involve replacing Vector with ArrayList, but that would change the behavior if there's concurrent modification. However, since the tests don't mention thread safety, maybe replace Vector with ArrayList. Let's check.
+
+In SimplePlot's addPoint method, it adds elements to the Vector. If we replace Vector with ArrayList, we need to adjust the code. For example, in PhasePlot's plotGraph, the code uses Enumeration e = points.elements(). If points is now an ArrayList, we can use a for-each loop or an iterator.
+
+So steps for PhasePlot:
+
+Change Vector to List<DPoint> in SimplePlot, and initialize it as an ArrayList. Then, in PhasePlot's plotGraph, replace Enumeration with an iterator or enhanced loop.
+
+For example:
+
+Original code in PhasePlot:
+
+for (Enumeration e = points.elements() ; e.hasMoreElements() ;) {
+
+DPoint op = (DPoint)e.nextElement() ;
+
+...
+
+}
+
+Replace with:
+
+for (DPoint op : points) {
+
+...
+
+}
+
+But this requires that in SimplePlot, points is a List that supports iteration. So changing Vector to ArrayList in SimplePlot would make this possible.
+
+So in SimplePlot.java:
+
+public Vector points; → public List<DPoint> points = new ArrayList<>();
+
+And in the init method: points = new ArrayList<>();
+
+Similarly, in resetGraph: points = new ArrayList<>();
+
+This would modernize the code, using generics and ArrayList instead of Vector. However, Vector is synchronized, while ArrayList is not. Since the tests don't mention thread-safety, this should be okay. But need to check if any code relies on Vector's synchronization. The existing code in addPoint is called in a single-threaded manner (probably), so switching to ArrayList is acceptable.
+
+Another area: In Plot.java's calcX and calcY methods, they use new Double(...) which is deprecated. Replace with (int) Math.round(...) or casting. For example:
+
+Original:
+
+Double ret = new Double(leftRule + ((d - minx)/scaleX);
+
+return ret.intValue();
+
+Can be replaced with:
+
+return (int) Math.round(leftRule + ((d - minx)/scaleX);
+
+Wait, but the original code uses Double's intValue, which truncates. So maybe cast directly:
+
+return (int) (leftRule + ((d - minx)/scaleX);
+
+Same for calcY.
+
+So in Plot.java:
+
+public int calcX(double d) {
+
+return (int) (leftRule + ((d - minx)/scaleX);
+
+}
+
+public int calcY(double d) {
+
+return (int) (topRule + dheight - (d - miny)/scaleY);
+
+}
+
+Wait, the original code for calcY was:
+
+Double ret = new Double((d - miny)/scaleY);
+
+return topRule + dheight - ret.intValue();
+
+Which is equivalent to:
+
+int temp = (int) ((d - miny)/scaleY);
+
+return topRule + dheight - temp;
+
+So yes, replacing with:
+
+return topRule + dheight - (int) ((d - miny)/scaleY);
+
+Which is the same as:
+
+(int) (topRule + dheight - ((d - miny)/scaleY));
+
+Wait, no:
+
+The original code is (d - miny)/scaleY → converted to Double, then intValue() (truncated). Then subtract from topRule + dheight.
+
+So (d - miny)/scaleY could be a double. Truncating it to int (floor for positive numbers) then subtract from topRule + dheight.
+
+So, for example, if (d - miny)/scaleY is 5.9, then ret.intValue() is 5. So topRule + dheight -5.
+
+So, using (int) ((d - miny)/scaleY) is correct.
+
+Therefore, replacing new Double(...) with direct casting.
+
+Another point: in Plot's drawRulers method, they create Float objects using new Float(...), which is deprecated. Replace with Float.valueOf(...) or just parse.
+
+Original code:
+
+stF = new Float(maxy + (maxy%ystep));
+
+Replace with:
+
+stF = Float.valueOf((float) (maxy + (maxy % ystep)));
+
+But actually, since maxy is a double, adding maxy % ystep (also a double), then cast to float.
+
+Alternatively, since highY is an int (they take stF.intValue()), maybe we can compute directly:
+
+int highY = (int) (maxy + (maxy % ystep));
+
+Wait, but in Java, the % operator for doubles may not behave as expected. Wait, no: maxy is a double, ystep is an int. So (maxy % ystep) is the remainder of maxy divided by ystep. However, adding that to maxy and then converting to int may not be the right approach. But perhaps the original code intended to round up to the nearest multiple of ystep?
+
+Alternatively, maybe the original code is incorrect. But since we need to maintain the behavior to pass tests, we have to replicate the same logic.
+
+But regardless, creating a Float via constructor is deprecated. So replace new Float(...) with Float.valueOf(...).
+
+So in drawRulers:
+
+stF = new Float(maxy + (maxy%ystep)) → stF = (float) (maxy + (maxy % ystep));
+
+But since stF is then used as stF.intValue(), perhaps it's better to compute directly:
+
+highY = (int) Math.ceil(maxy / ystep) * ystep;
+
+Wait, the original code computes maxy + (maxy % ystep). Let's see: For example, if maxy is 7 and ystep is 5, then maxy%ystep is 2. So 7+2=9, which is the next multiple of 5? No, 7 + (7%5) =7 +2=9, which is not a multiple of 5. Wait, perhaps the original code is incorrect, but we have to replicate it exactly. So for the sake of maintaining existing behavior, even if it's flawed, we should keep the same calculation but use Float.valueOf instead of new Float.
+
+So replace:
+
+stF = new Float(maxy + (maxy%ystep));
+
+with:
+
+stF = Float.valueOf((float)(maxy + (maxy % ystep)));
+
+But wait, (maxy % ystep) when ystep is an integer. For example, if maxy is 10.5 and ystep is 5, then maxy % ystep is 0.5. So adding that to maxy gives 10.5 +0.5=11.0. Then stF.intValue() is 11.
+
+But maybe this is intended to find the next higher multiple of ystep. For example, 10.5 would be rounded up to 15 (if ystep is 5). But the current code gives 11.0, which is not. So maybe the original code has a bug here. But according to the tests, we need to maintain the current behavior. So proceed with replacing the constructor.
+
+Same for the other instances in drawRulers.
+
+Another point: in SimplePlot's addPoint method, it checks if points != null before adding. But after resetGraph, points is set to new Vector(), which is not null. So maybe the null check is redundant. But to maintain behavior, leave as is.
+
+Now, let's check for any other Java 17 features. For example, using records where possible. However, DPoint is mutable (has setters), so it can't be a record. The other classes are components with mutable state, so records aren't applicable here.
+
+Switch statements: The code doesn't use switch statements, so no changes there.
+
+Sealed classes: Probably not needed here.
+
+Pattern matching: Not applicable here.
+
+Text blocks: The toString method in DPoint uses concatenation. Could be replaced with a formatted string, but not necessary.
+
+Now, handling the test scenarios:
+
+For DPoint:
+
+- The default constructor sets valid and semivalid to false. The copy constructor creates a valid DPoint even if the original is invalid. So when you copy a default DPoint (invalid), the new DPoint has valid=true, semivalid=true. Because the copy constructor calls getX() and getY() on the original DPoint (which returns 0,0), and sets valid and semivalid to true.
+
+But according to scenario 1.3, when you copy an invalid DPoint, the copiedPoint becomes valid. However, in the existing code, the copy constructor's valid and semivalid are set to true regardless of the original. So even if the original DPoint is invalid, the copied one is valid. So this is correct.
+
+But the original DPoint's getX() and getY() return 0.0 even if invalid. The test expects that the copied point is valid and has the original's values (0.0). So the code is correct here.
+
+In PhasePlot's plotGraph method, the code uses (p.getX() % phase) * (1/phase). Wait, 1/phase is integer division if phase is a double. Wait, no, phase is a double. So (1/phase) is a division in doubles. For example, phase=0.5 → 1/0.5=2.0, so x is (p.getX()%0.5) * 2.0. That would wrap the x value into [0,1) range. Then, if x is <=0.5, it adds 1.0 to plot again. So for x=0.3, transformed to 0.6 (0.3%0.5=0.3, *2=0.6). Which is >0.5, so no duplicate. But if x=0.2, transformed to 0.4, then duplicate at 1.4 (0.4+1=1.4). So the code seems correct here.
+
+In the Histogram's init method, when creating occurences array, if (high - low) / step is not an integer, the code truncates. For example, if high=10, low=0, step=2.5 → (10-0)/2.5=4 → array size 4. But the bins would be 0-2.5, 2.5-5, etc. But the current code's addOccurence method may have issues if the step is not a divisor of (high - low). But according to the tests, scenario 2.1 expects that step=2.0 with low=0 and high=10 gives 5 bins. Let's see: (10-0)/2=5 → array size 5. Bins are 0-2, 2-4, ..., 8-10. So yes.
+
+Another thing to check: in addOccurence, if the value is exactly maxx, which category does it fall into? For example, high=10, step=2. The last category is 8-10. So a value of 10 would be in which bin? Let's see:
+
+category starts at minx + xstep → 0+2=2. Then, loop increments category until category < o. If o is 10, category starts at 2, increments to 4,6,8,10. So, while (category < o) → 10 < 10 is false. So which is 4 (since we did 4 increments: 2→4→6→8→10). But the array has 5 elements (indices 0-4). So which is 4, which is okay. So o=10 is placed in bin 4 (8-10). So that's correct.
+
+Now, for Java 17, ensure that all deprecated constructs are replaced.
+
+Summary of changes needed:
+
+1. Replace deprecated Double and Float constructors with valueOf or casting.
+
+2. Replace Vector with ArrayList in SimplePlot and adjust Enumeration usage to enhanced for-loops.
+
+3. Use generics where possible (e.g., List<DPoint> instead of raw Vector).
+
+4. Use @Override annotations where applicable.
+
+5. Remove redundant semicolons after method declarations (e.g., in DPoint's isValid()).
+
+6. Update Plot's calcX and calcY to avoid deprecated Double constructors.
+
+7. Replace new Float(...) with Float.valueOf(...) in Plot's drawRulers.
+
+8. Check for any other Java 5+ features like enhanced for-loops, autoboxing, etc.
+
+Let's go through each file step by step.
+
+File 1: DPoint.java
+
+- The isValid() method has a redundant semicolon. Remove it.
+
+- The copy constructor takes a DPoint and calls getX() and getY(), which even if the original is invalid, returns 0.0. So the copied point is valid. That's as per existing code.
+
+- No deprecated code here except maybe the Double constructor, but DPoint doesn't use that. The only deprecation would be in other files.
+
+File 2: Histogram.java
+
+- The line Double nogrps = new Double((high - low)/ step); → replace with int nogrps = (int) ((high - low)/step); and occurences = new int[nogrps];.
+
+File 3: PhasePlot.java
+
+- Replace Enumeration with a for-each loop by changing the Vector in SimplePlot to a List<DPoint>.
+
+File 4: Plot.java
+
+- calcX and calcY: Replace new Double(...) with direct casting.
+
+- In drawRulers, replace new Float(...) with Float.valueOf(...).
+
+File 5: SimplePlot.java
+
+- Replace Vector points with List<DPoint> points = new ArrayList<>();
+
+- In resetGraph, points = new ArrayList<>();
+
+- In init, points = new ArrayList<>();
+
+- In plotGraph, replace Enumeration with enhanced for-loop.
+
+Now, let's code these changes.
+
+For DPoint.java:
+
+Change:
+
+public boolean isValid() { return valid; };
+
+to
+
+public boolean isValid() { return valid; }
+
+Remove the semicolon.
+
+For Histogram.java's init method:
+
+Original:
+
+Double nogrps= new Double ((high - low)/ step);
+
+occurences=new int[nogrps.intValue()];
+
+Replace with:
+
+int nogrps = (int) ((high - low) / step);
+
+occurences = new int[nogrps];
+
+For PhasePlot.java's plotGraph method:
+
+Original:
+
+for (Enumeration e = points.elements() ; e.hasMoreElements() ;) {
+
+DPoint op = (DPoint)e.nextElement() ;
+
+...
+
+}
+
+Change to:
+
+for (DPoint op : points) {
+
+...
+
+}
+
+But this requires that points is a List (Iterable), which will be done in SimplePlot.
+
+For Plot.java:
+
+In calcX and calcY:
+
+Original:
+
+public int calcX(double d) {
+
+Double ret=new Double(leftRule+((d - minx)/scaleX);
+
+return ( ret.intValue() );
+
+}
+
+public int calcY(double d) {
+
+Double ret=new Double((d- miny)/scaleY);
+
+return ( topRule + dheight - ret.intValue() );
+
+}
+
+Replace with:
+
+public int calcX(double d) {
+
+return (int) (leftRule + ((d - minx)/scaleX));
+
+}
+
+public int calcY(double d) {
+
+return topRule + dheight - (int) ((d - miny)/scaleY);
+
+}
+
+In drawRulers:
+
+Original:
+
+stF = new Float(maxy + (maxy%ystep));
+
+Replace with:
+
+stF = Float.valueOf((float)(maxy + (maxy % ystep)));
+
+But since stF is immediately used to get intValue(), perhaps compute directly:
+
+int highY = (int) (maxy + (maxy % ystep));
+
+Wait, but the original code uses stF.intValue() which is the same as casting to int. However, using Float.valueOf would create a Float object which may not be necessary. Alternatively, compute as:
+
+highY = (int) (maxy + (maxy % ystep));
+
+Similarly for lowY, highX, lowX.
+
+So in drawRulers:
+
+Original code:
+
+stF = new Float(maxy + (maxy%ystep));
+
+highY =  stF.intValue();
+
+Replace with:
+
+highY = (int) (maxy + (maxy % ystep));
+
+Same for lowY:
+
+stF = new Float(miny - (miny%ystep));
+
+lowY = stF.intValue();
+
+Replace with:
+
+lowY = (int) (miny - (miny % ystep));
+
+Similarly for highX and lowX.
+
+So:
+
+Original:
+
+stF = new Float(maxx - (maxx%xstep));
+
+highX = stF.intValue();
+
+Replace with:
+
+highX = (int) (maxx - (maxx % xstep));
+
+Original:
+
+stF = new Float(minx  - (minx%xstep));
+
+lowX = stF.intValue();
+
+Replace with:
+
+lowX = (int) (minx - (minx % xstep));
+
+This way, we avoid creating Float objects and use direct casting.
+
+In SimplePlot.java:
+
+Change:
+
+public Vector points;
+
+to
+
+public List<DPoint> points = new ArrayList<>();
+
+In the constructor:
+
+public SimplePlot(...) {
+
+...
+
+points = new ArrayList<>();
+
+}
+
+In resetGraph():
+
+public void resetGraph() {
+
+points = new ArrayList<>();
+
+}
+
+In init():
+
+points = new ArrayList<>();
+
+Then, in plotGraph, replace the Enumeration loop with a for-each loop.
+
+Original:
+
+for (Enumeration e = points.elements() ; e.hasMoreElements() ;) {
+
+DPoint p = (DPoint)e.nextElement() ;
+
+plotPoint(p,g);
+
+}
+
+Replace with:
+
+for (DPoint p : points) {
+
+plotPoint(p, g);
+
+}
+
+Similarly, in PhasePlot's plotGraph:
+
+Original:
+
+for (Enumeration e = points.elements() ; e.hasMoreElements() ;) {
+
+DPoint op = (DPoint)e.nextElement() ;
+
+...
+
+}
+
+Replace with:
+
+for (DPoint op : points) {
+
+...
+
+}
+
+Now, this requires that in PhasePlot, the points field is accessible. Since PhasePlot extends SimplePlot, and the points field is in SimplePlot (changed to List<DPoint>), and assuming that it's accessible (if it's public or protected). In the original code, points is public in SimplePlot. So it should be accessible.
+
+Wait, in the original code, SimplePlot has:
+
+public Vector points;
+
+After changing to:
+
+public List<DPoint> points = new ArrayList<>();
+
+So in PhasePlot, which is a subclass, accessing points (which is public) is allowed.
+
+Therefore, the code in PhasePlot's plotGraph can loop through points via the enhanced for-loop.
+
+Now, test scenario 3.1 and 3.2 should work as before.
+
+Another thing to check: in PhasePlot's plotGraph, after transforming x, the code creates a new DPoint(p) which copies the original point. Then modifies x and plots. The copied DPoint's valid status is true, as per the copy constructor. So even if the original DPoint was invalid, the copied one is valid. But according to test scenario 5.1, adding an invalid DPoint to SimplePlot results in plotting (0,0). Because the DPoint's getX and getY return 0.0 even if invalid. The copied DPoint in PhasePlot's plotGraph is valid, so it will plot (0.0, y). So the test scenario 5.1 is covered.
+
+Now, potential issues:
+
+- Changing Vector to ArrayList: Are there any synchronization issues? Since the original code uses Vector (which is thread-safe), but if the code is not intended to be used in a multi-threaded context, this is okay. The tests don't mention concurrency.
+
+- The copy constructor in DPoint may create a valid point even if the original is invalid. According to the test scenario 1.3, this is expected.
+
+- The calculation of highY, lowY, etc., in Plot's drawRulers may have issues with floating-point precision after removing the Float objects. But since we're directly casting to int, it should be the same as before.
+
+Other possible changes:
+
+- Use @Override annotations for overridden methods.
+
+For example, in all classes that extend Plot and override plotGraph, add @Override.
+
+In Histogram.java:
+
+public void plotGraph(Graphics g) → add @Override
+
+In PhasePlot.java:
+
+public void plotGraph(Graphics g) → @Override
+
+In SimplePlot.java:
+
+public void plotGraph(Graphics g) → @Override
+
+Also, in Plot's paint method:
+
+public void paint(Graphics g) → this is overriding Canvas's paint method. So add @Override.
+
+In DPoint, the toString method overrides Object's toString, so add @Override.
+
+Similarly, in Plot, the paint method should have @Override.
+
+Adding these annotations where applicable.
+
+Another possible change is using the diamond operator <> in constructors where possible. For example, in SimplePlot's points = new ArrayList<>();.
+
+Now, let's check all files for these changes.
+
+File 1: DPoint.java
+
+- Add @Override to toString:
+
+@Override
+
+public String toString() {
+
+return String.format("%f  %f", x, y);
+
+}
+
+But the original uses ""+x+"  "+y. To match exactly, perhaps better to use String.format.
+
+Alternatively, keep as is. But the original may have formatting issues with very small or large numbers. However, the tests don't mention the toString format, just the values. So changing to String.format is safe.
+
+File 2: Histogram.java
+
+- Add @Override to plotGraph and resetGraph.
+
+In Histogram's resetGraph:
+
+@Override
+
+public void resetGraph() { ... }
+
+In plotGraph:
+
+@Override
+
+public void plotGraph(Graphics g) { ... }
+
+File 3: PhasePlot.java
+
+- Add @Override to plotGraph, resetGraph, setPhase, getPhase.
+
+Wait, setPhase and getPhase are not overrides. Only plotGraph and resetGraph.
+
+PhasePlot's resetGraph:
+
+@Override
+
+public void resetGraph() { ... }
+
+plotGraph:
+
+@Override
+
+public void plotGraph(Graphics g) { ... }
+
+File 4: Plot.java
+
+- Add @Override to paint and plotGraph.
+
+In Plot:
+
+@Override
+
+public void paint(Graphics g) { ... }
+
+The plotGraph method is abstract (in Plot), so no need for @Override here, but in subclasses.
+
+File 5: SimplePlot.java
+
+- Add @Override to resetGraph, plotGraph.
+
+In resetGraph:
+
+@Override
+
+public void resetGraph() { ... }
+
+In plotGraph:
+
+@Override
+
+public void plotGraph(Graphics g) { ... }
+
+Also, in addPoint:
+
+public void addPoint (DPoint p ) { ... }
+
+No override here.
+
+Now, check for any other Java 17 features. For example, sealed classes or pattern matching are not needed here.
+
+Another possible improvement is using java.util.Objects for null checks, but the existing code doesn't have such checks.
+
+Now, let's apply all these changes to each file.
+
+Final code for each file:
+
+File 1: DPoint.java
+
+package hipparcos.plot;
+
+public class DPoint {
+
+private double x = 0, y = 0;
+
+private boolean valid;
+
+private boolean semivalid;
+
+public DPoint(double x, double y) {
+
+valid = true;
+
+semivalid = true;
+
+this.x = x;
+
+this.y = y;
+
+}
+
+public DPoint(DPoint p) {
+
+valid = true;
+
+semivalid = true;
+
+this.x = p.getX();
+
+this.y = p.getY();
+
+}
+
+public DPoint() {
+
+valid = false;
+
+semivalid = false;
+
+}
+
+public boolean isValid() { return valid; }
+
+public double getX() {
+
+return x;
+
+}
+
+public double getY() {
+
+return y;
+
+}
+
+public void setX(double x) {
+
+this.x = x;
+
+semiValidate();
+
+}
+
+public void setY(double y) {
+
+this.y = y;
+
+semiValidate();
+
+}
+
+private void semiValidate() {
+
+if (!valid) {
+
+valid = semivalid;
+
+semivalid = true;
+
+}
+
+}
+
+@Override
+
+public String toString() {
+
+return x + "  " + y;
+
+}
+
+}
+
+Changes made:
+
+- Removed redundant semicolon in isValid().
+
+- Added @Override to toString.
+
+- Formatted code for readability.
+
+File 2: Histogram.java
+
+package hipparcos.plot;
+
+import java.awt.*;
+
+public class Histogram extends Plot {
+
+private int[] occurences;
+
+private boolean gotOne = false;
+
+private Color plotcol;
+
+public Histogram(String xlabel, String ylabel, int low, int high,
+
+double step, Color col) {
+
+setXlabel(xlabel);
+
+setYlabel(ylabel);
+
+plotcol = col;
+
+init(low, high, step);
+
+}
+
+@Override
+
+public void resetGraph() {
+
+miny = 0;
+
+maxy = 10;
+
+if (occurences != null) {
+
+for (int i = 0; i < occurences.length; i++) {
+
+occurences[i] = 0;
+
+}
+
+}
+
+}
+
+public void init(int low, int high, double step) {
+
+gotOne = false;
+
+minx = low;
+
+maxx = high;
+
+miny = 0;
+
+maxy = 10;
+
+xstep = step;
+
+numberStep = 5;
+
+int nogrps = (int) ((high - low) / step);
+
+occurences = new int[nogrps];
+
+}
+
+public void addOccurence(double o) {
+
+gotOne = true;
+
+int which = 0;
+
+double category = minx + xstep;
+
+while (category < o && category < maxx) {
+
+category += xstep;
+
+which++;
+
+}
+
+while (which >= occurences.length) {
+
+which--;
+
+}
+
+occurences[which]++;
+
+if (occurences[which] > maxy) {
+
+maxy = occurences[which];
+
+ystep = -1;
+
+}
+
+repaint();
+
+}
+
+@Override
+
+public void plotGraph(Graphics g) {
+
+if (gotOne) {
+
+g.setColor(plotcol);
+
+double categ = minx;
+
+for (int i = 0; i < occurences.length; i++) {
+
+plotBar(categ, occurences[i], g);
+
+categ += xstep;
+
+}
+
+} else {
+
+g.setColor(Color.red);
+
+g.drawString(" No data", 30, (int)(this.getSize().height / 2));
+
+}
+
+}
+
+public void plotBar(double cat, int height, Graphics g) {
+
+int x = calcX(cat);
+
+int w = calcX(cat + xstep) - x;
+
+int y = calcY(height);
+
+int h = calcY(miny) - y;
+
+g.fillRect(x, y, w, h);
+
+}
+
+}
+
+Changes made:
+
+- Replaced Double with direct casting in init.
+
+- Added @Override annotations.
+
+- Fixed array declaration (int[] occurences).
+
+- Code formatting.
+
+File 3: PhasePlot.java
+
+package hipparcos.plot;
+
+import java.awt.*;
+
+public class PhasePlot extends SimplePlot {
+
+private double phase;
+
+public PhasePlot(String xlabel, String ylabel, double lowY, double highY, Color col) {
+
+super(xlabel, ylabel, 0, 1.5, lowY, highY, col);
+
+xstep = 0.1;
+
+numberStep = 1;
+
+phase = 0.5;
+
+}
+
+@Override
+
+public void resetGraph() {
+
+super.resetGraph();
+
+xstep = 0.5;
+
+numberStep = 1;
+
+}
+
+@Override
+
+public void plotGraph(Graphics g) {
+
+if (gotOne) {
+
+if (plotZeroLine) plotZero(g);
+
+g.setColor(plotcol);
+
+for (DPoint op : points) {
+
+DPoint p = new DPoint(op);
+
+double x = ((p.getX() % phase) * (1 / phase));
+
+p.setX(x);
+
+plotPoint(p, g);
+
+if (p.getX() <= 0.5) {
+
+p.setX(p.getX() + 1);
+
+plotPoint(p, g);
+
+}
+
+}
+
+} else {
+
+g.setColor(Color.red);
+
+g.drawString(" No data", 30, (int)(this.getSize().height / 2));
+
+}
+
+}
+
+public void setPhase(double phase) {
+
+this.phase = phase;
+
+repaint();
+
+}
+
+public double getPhase() {
+
+return phase;
+
+}
+
+}
+
+Changes made:
+
+- Replaced Enumeration with enhanced for-loop.
+
+- Added @Override annotations.
+
+- Code formatting.
+
+File 4: Plot.java
+
+package hipparcos.plot;
+
+import java.awt.*;
+
+public class Plot extends Canvas {
+
+protected double scaleX, scaleY;
+
+public double minx, miny, maxx, maxy;
+
+public int topRule, bottomRule, leftRule, rightRule, dheight;
+
+public int ystep = -1, numberStep = 5, ynumberStep = 5;
+
+public double xstep = -1;
+
+public int pointSize = 4;
+
+private String botText, leftText;
+
+private boolean inited = false;
+
+private void init() {
+
+topRule = 20;
+
+bottomRule = 30;
+
+rightRule = 20;
+
+leftRule = 25;
+
+setBackground(Color.white);
+
+minx = 0;
+
+maxx = 10;
+
+miny = 0;
+
+maxy = 10;
+
+botText = "X axis";
+
+leftText = "Y axis";
+
+inited = true;
+
+}
+
+public Plot() {
+
+init();
+
+}
+
+public void setScales() {
+
+Dimension d = this.getSize();
+
+int gWidth = d.width - leftRule - rightRule;
+
+int gHeight = d.height - bottomRule - topRule;
+
+dheight = gHeight;
+
+scaleX = (maxx - minx) / gWidth;
+
+scaleY = (maxy - miny) / gHeight;
+
+if (xstep <= -1) {
+
+xstep = getStep(scaleX);
+
+numberStep = getNumberStep(scaleX);
+
+}
+
+if (ystep == -1) {
+
+ystep = getStep(scaleY);
+
+ynumberStep = getNumberStep(scaleY);
+
+}
+
+}
+
+public int getStep(double scale) {
+
+int ret = 1;
+
+if (scale <= 2) ret = 50;
+
+if (scale <= 1) ret = 10;
+
+if (scale < 0.1) ret = 1;
+
+return ret;
+
+}
+
+public int getNumberStep(double scale) {
+
+int ret = 1;
+
+if (scale <= 2) ret = 50;
+
+if (scale <= 1) ret = 10;
+
+if (scale < 0.1) ret = 5;
+
+return ret;
+
+}
+
+@Override
+
+public void paint(Graphics g) {
+
+if (!inited) init();
+
+drawRulers(g);
+
+plotGraph(g);
+
+}
+
+public void plotGraph(Graphics g) {
+
+g.setColor(Color.red);
+
+g.drawString(" Not Implemented", 30, (int)(this.getSize().height / 2));
+
+}
+
+public int calcX(double d) {
+
+return (int) (leftRule + ((d - minx) / scaleX));
+
+}
+
+public int calcY(double d) {
+
+return topRule + dheight - (int) ((d - miny) / scaleY);
+
+}
+
+private void drawRulers(Graphics g) {
+
+String ly, hy, st;
+
+int cShift = 9;
+
+int highY, lowY, lowX, highX, tick;
+
+double dtick;
+
+int posLowY, posHighY, step, posLowX, posHighX;
+
+setScales();
+
+highY = (int) (maxy + (maxy % ystep));
+
+lowY = (int) (miny - (miny % ystep));
+
+posHighY = calcY(highY) + (cShift / 2);
+
+posLowY = calcY(lowY) + (cShift / 2);
+
+highX = (int) (maxx - (maxx % xstep));
+
+lowX = (int) (minx - (minx % xstep));
+
+posHighX = calcX(highX) - (cShift / 2);
+
+posLowX = calcX(lowX) - cShift;
+
+g.setColor(Color.black);
+
+g.drawString(leftText, 1, 12);
+
+Dimension d = this.getSize();
+
+int center = (d.width / 2) - ((botText.length() / 2) * 7);
+
+g.drawString(botText, center, d.height - (cShift / 2));
+
+g.drawLine(leftRule - 1, topRule, leftRule - 1, d.height - bottomRule);
+
+g.drawLine(leftRule - 1, d.height - bottomRule, d.width - rightRule, d.height - bottomRule);
+
+tick = lowY - (lowY % ystep);
+
+int endTick = highY - (highY % ystep);
+
+while (tick <= endTick) {
+
+int posTick = calcY(tick);
+
+g.drawLine(leftRule - 5, posTick, leftRule, posTick);
+
+if (tick % ynumberStep == 0) {
+
+g.drawString(Integer.toString(tick), 3, posTick + (cShift / 2));
+
+}
+
+tick += ystep;
+
+}
+
+dtick = lowX - (lowX % xstep);
+
+endTick = (int) (highX - (highX % xstep));
+
+while (dtick <= endTick) {
+
+int posTick = calcX(dtick);
+
+g.drawLine(posTick, (d.height - bottomRule), posTick, (d.height - bottomRule + 5));
+
+if (dtick % numberStep == 0) {
+
+g.drawString(Integer.toString((int) dtick), posTick - (cShift / 2), d.height - 14);
+
+}
+
+dtick += xstep;
+
+}
+
+}
+
+public void setXlabel(String l) {
+
+botText = l;
+
+}
+
+public void setYlabel(String l) {
+
+leftText = l;
+
+}
+
+public void plotPoint(double rx, double ry, Graphics g) {
+
+int x = calcX(rx);
+
+int y = calcY(ry);
+
+int off = pointSize / 2;
+
+g.fillOval(x - off, y - off, pointSize, pointSize);
+
+}
+
+public void plotPoint(DPoint p, Graphics g) {
+
+plotPoint(p.getX(), p.getY(), g);
+
+}
+
+}
+
+Changes made:
+
+- Replaced new Double and new Float with direct casting.
+
+- Added @Override to paint method.
+
+- Updated calcX and calcY.
+
+- Removed unnecessary object creation for Double and Float.
+
+- Code formatting.
+
+File 5: SimplePlot.java
+
+package hipparcos.plot;
+
+import java.awt.*;
+
+import java.util.ArrayList;
+
+import java.util.List;
+
+public class SimplePlot extends Plot {
+
+public List<DPoint> points = new ArrayList<>();
+
+public boolean gotOne = false;
+
+public Color plotcol;
+
+public boolean plotZeroLine = true;
+
+static public Color zeroLineColor = new Color(255, 105, 255);
+
+public SimplePlot(String xlabel, String ylabel, double lowX, double highX,
+
+double lowY, double highY, Color col) {
+
+setXlabel(xlabel);
+
+setYlabel(ylabel);
+
+plotcol = col;
+
+init(lowX, highX, lowY, highY);
+
+}
+
+@Override
+
+public void resetGraph() {
+
+points = new ArrayList<>();
+
+}
+
+public void init(double lowX, double highX, double lowY, double highY) {
+
+gotOne = false;
+
+minx = lowX;
+
+maxx = highX;
+
+miny = lowY;
+
+maxy = highY;
+
+xstep = 1;
+
+ystep = 1;
+
+numberStep = 1;
+
+ynumberStep = 5;
+
+points = new ArrayList<>();
+
+}
+
+public void addPoint(DPoint p) {
+
+gotOne = true;
+
+if (points != null) points.add(p);
+
+repaint();
+
+}
+
+@Override
+
+public void plotGraph(Graphics g) {
+
+if (gotOne && (points != null)) {
+
+if (plotZeroLine) plotZero(g);
+
+g.setColor(plotcol);
+
+for (DPoint p : points) {
+
+plotPoint(p, g);
+
+}
+
+} else {
+
+g.setColor(Color.red);
+
+g.drawString(" No data", 30, (int)(this.getSize().height / 2));
+
+}
+
+}
+
+public void plotZero(Graphics g) {
+
+int y1 = calcY(0);
+
+int x1 = calcX(minx);
+
+int y2 = y1;
+
+int x2 = calcX(maxx);
+
+g.setColor(zeroLineColor);
+
+g.drawLine(x1, y1, x2, y2);
+
+}
+
+}
+
+Changes made:
+
+- Replaced Vector with List<DPoint> and ArrayList.
+
+- Updated loops to use enhanced for-loop.
+
+- Added @Override annotations.
+
+- Code formatting.
+
+To modernize the code to Java 17 while maintaining the original functionality and adhering to the test requirements, the following changes have been made:
+
+Key Modernizations:
+Deprecated Constructor Replacement: Replaced deprecated Double and Float constructors with direct casting or valueOf methods.
+
+Generics and Collections: Replaced Vector with ArrayList for better performance and type safety, using generics.
+
+Enhanced For-Loops: Updated loops using Enumeration to enhanced for-loops for readability.
+
+Code Cleanup: Removed redundant semicolons, added @Override annotations, and improved code formatting.
+
+Direct Casting: Simplified calculations by directly casting values instead of using boxed objects.
+
+Files Updated:
+1. DPoint.java
+
+Removed redundant semicolon in isValid().
+
+Added @Override to toString().
+
+2. Histogram.java
+
+Replaced Double with direct casting for bin calculation.
+
+Added @Override annotations.
+
+Improved array initialization.
+
+3. PhasePlot.java
+
+Replaced Enumeration with enhanced for-loop.
+
+Added @Override annotations.
+
+4. Plot.java
+
+Simplified calcX and calcY using direct casting.
+
+Removed deprecated Float constructors in ruler calculations.
+
+Added @Override to paint().
+
+5. SimplePlot.java
+
+Replaced Vector with List<DPoint> and ArrayList.
+
+Updated loops to use enhanced for-loop.
+
+Added @Override annotations.
+
+These changes ensure compatibility with Java 17 while preserving the original behavior required by the tests.
