@@ -22,3 +22,15 @@ Combinar os pontos fortes dos métodos tradicionais de APR com as capacidades de
 
 - Formatted code: o código do sistema no formato enviado para a LLM; aquivos de compilação, configuração de IDE, e arquivos vazios, por exemplo, foram ignorados.
 - gemini: organizar logs de conversas para testes e geração de código.
+
+# Motivation
+
+Legacy systems are a persistent challenge in software engineering, often burdened with security vulnerabilities, technical debt, and high maintenance costs. In the U.S. federal government alone, many legacy systems range from 30 to over 60 years old [1], creating substantial obstacles related to efficiency, maintainability, staffing, and security. These issues are not confined to government institutions—many industries, including finance, healthcare, and manufacturing, rely on outdated software that is difficult to adapt to modern requirements.
+
+The modernization of legacy software has been described as a “wicked problem” [2], [3], resisting decades of well-intentioned policies and technical initiatives. Traditional approaches often rely on rule-based refactoring, static pattern matching, or complete system rewrites, all of which are costly, labor-intensive, and prone to introducing regressions. Moreover, developers and decision-makers remain cautious about fully integrating automation into modernization workflows, particularly for safety-critical systems where even minor unintended changes can introduce significant risks.
+
+A key barrier to modernization is validation. Since many legacy systems lack comprehensive documentation and test suites, verifying that modernized code preserves the original behavior is a major challenge. Without a well-defined correctness criterion, automated repair techniques can introduce subtle errors or fail to make meaningful improvements.
+
+Large Language Models (LLMs) offer a promising new approach by not only assisting in code transformation but also in the generation of acceptance criteria—a crucial aspect of ensuring correctness. By leveraging LLMs to infer specifications from existing code, logs, or partial documentation, we can create robust test suites that serve as a foundation for both validation and automated repair. In turn, this enables a more structured, iterative modernization process that enhances reliability while reducing manual effort.
+
+This project explores the intersection of Automated Program Repair (APR) and LLM-generated acceptance criteria, adapting techniques initially tested on competitive programming problems to real-world legacy systems. Our goal is to bridge the gap between theoretical APR advancements and practical modernization challenges, ensuring that automated fixes are trustworthy, scalable, and aligned with domain-specific constraints.
