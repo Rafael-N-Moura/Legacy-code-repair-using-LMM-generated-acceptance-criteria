@@ -35,6 +35,62 @@ Large Language Models (LLMs) offer a promising new approach by not only assistin
 
 This project explores the intersection of Automated Program Repair (APR) and LLM-generated acceptance criteria, adapting techniques initially tested on competitive programming problems to real-world legacy systems. Our goal is to bridge the gap between theoretical APR advancements and practical modernization challenges, ensuring that automated fixes are trustworthy, scalable, and aligned with domain-specific constraints.
 
+# Study Setting
+Given the complexity and heterogeneity of real-world legacy systems, our experimental setup was designed to balance practical relevance with controlled evaluation. To this end, we selected a set of representative legacy projects written in older versions of Java, where shared coding patterns and constraints provide a realistic testbed for assessing automated repair techniques guided by LLM-generated acceptance criteria.
+
+## Legacy Projects Selection
+
+To simulate real-world conditions, we chose three projects from different application domains and with varying levels of complexity:
+
+### Hipparcos-plot
+A module from a suite of tools originally developed by the European Space Agency in 1997, which was revisited and partially modernized approximately 9 years ago. This project serves as an example of legacy systems used in critical aerospace applications, where code maintainability and security are paramount.
+### F-sharp
+A music library management application that integrates with a native MySQL database. Written 16 years ago, this project exemplifies the challenges of legacy systems in managing database connections and adapting to new user requirements.
+### LibraryManager
+A personal library management application developed about 12 years ago. Although it is of smaller scale, it illustrates common challenges in modernizing applications designed for organizing and managing personal data.
+
+The choice of these projects is based on the premise that, even if they represent lower complexity compared to large-scale corporate systems, the inherent difficulties of legacy systems—such as outdated documentation, technical debt, and tightly coupled code—are pervasive and can be effectively exploited to validate the proposed techniques.
+
+## Research Questions
+
+Our study is driven by the following core questions:
+
+### RQ1
+How effective are LLMs at generating acceptance criteria for code repair?
+We assess the ability of LLMs to synthesize robust test cases and criteria that validate whether an automated repair maintains the intended behavior of legacy code.
+### RQ2
+How well do the APR capabilities of LLMs work on legacy code?
+This question evaluates how well LLM-guided APR methods can handle the nuances of legacy systems, especially in the presence of convoluted logic and outdated coding practices.
+### RQ3
+How do the tests affect the repair process?
+We investigate whether the presence of LLM-generated test suites improves repair outcomes compared to traditional prompt engineering techniques, analyzing if additional test cases guide the LLM to generate more accurate and reliable patches.
+
+## LLM Models and Experimental Setup
+
+For the automated generation of acceptance criteria and repair suggestions, we selected three state-of-the-art LLMs, each with distinct strengths in reasoning and code synthesis:
+
+### GPT-4-o (Model 1)
+Chosen for its advanced language understanding and coding capabilities, serving as a baseline for reasoning-intensive tasks.
+### Deepseek R1 (Model 2)
+Selected for its focus on code synthesis, this model is evaluated for its ability to identify patterns and suggest repairs in complex legacy code contexts.
+### Gemini Flash Thinking (Model 3)
+A model emphasizing both reasoning and code generation. For this model, the following parameters were adopted:
+Temperature: 0.7 – balancing creativity and precision.
+Maximum output length: 65,536 tokens – to allow for comprehensive and detailed responses.
+Top_p: 0.95 – ensuring diversity in outputs while maintaining coherence.
+
+The selection of these models is justified by the need to explore diverse approaches—from pure natural language generation to deep learning-based code synthesis—allowing for a comprehensive assessment of APR capabilities.
+
+## Rationale Behind the Choices
+
+### Project Selection
+Although the chosen projects have reduced complexity compared to large-scale legacy systems, their origin as legacy systems written in older Java versions offers a controlled yet realistic environment. The similarities among these systems (e.g., coding patterns, architectural constraints) allow us to extrapolate findings to more complex legacy scenarios.
+### LLM Models
+Employing models with different strengths ensures that our evaluation is not biased toward a single approach. Combining reasoning-oriented (GPT-4-o) and code-synthesis-focused (Deepseek R1, Gemini Flash Thinking) models enables us to assess a broad spectrum of APR capabilities.
+### Experimental Setup
+The design of the experimental setup is aimed at validating whether LLM-generated acceptance criteria can provide a robust foundation for automated repair, ensuring that modifications preserve the original behavior while addressing identified defects.
+
+
 # Methodology
 Our methodology is designed to integrate LLM-generated acceptance criteria with an iterative automated repair process for legacy systems. The approach is structured into distinct phases: generation of acceptance criteria, utilization of LLMs for repair, and iterative validation and refinement of the generated patches.
 
