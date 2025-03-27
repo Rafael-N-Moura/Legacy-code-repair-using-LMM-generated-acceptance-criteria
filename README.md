@@ -100,3 +100,16 @@ Avaliado pela facilidade de integração, sucesso/fracasso após a compilação 
 
 Todos os prompts, conjuntos de testes, e códigos modernizados são organizados dentro do repositório com pastas dedicadas (por exemplo, a pasta "gemini" para registros de conversas e geração de testes) para garantir total reprodutibilidade dos experimentos. Para uma leitura mais abrangente de nossa análise, consulte a apresentação em slides.
 
+# References
+
+- 1: Leveraging LLMs for Legacy Code Modernization: Challenges and Opportunities for LLM-Generated Documentation 
+https://arxiv.org/pdf/2411.14971
+
+- 2: HipparcosJava
+https://github.com/esa/hipparcosJava/
+
+- 3: F-Sharp
+https://github.com/saahil/F-Sharp
+
+- 4: Automatic Repair of Programs from Large Language Models
+https://ieeexplore.ieee.org/document/10172854/
