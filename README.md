@@ -1,116 +1,102 @@
 # Legacy Code Repair Using LMM Generated Acceptance Criteria
 
-O projeto propõe reavaliar e expandir os experimentos apresentados no estudo “Automated Repair of Programs from Large Language Models”, introduzindo novas perspectivas e funcionalidades que visam aumentar a aplicabilidade e a eficácia das técnicas de reparo automático de código. Em vez de focar apenas em problemas competitivos, como os do LeetCode, a ideia central é concentrar os esforços em sistemas legados, onde a manutenção e evolução do código são desafios reais em ambientes corporativos.
+Inspirado nos experimentos apresentados no estudo “Automated Repair of Programs from Large Language Models”, o projeto busca introduzir novas perspectivas e funcionalidades que visam aumentar a aplicabilidade e a eficácia das técnicas de reparo automático de código. Em vez de focar apenas em problemas competitivos, como os do LeetCode, a ideia central é concentrar os esforços em sistemas legados, onde a manutenção e evolução do código são desafios reais em ambientes corporativos.
 
-Para isso, inspirado nos experimentos originais e adaptando-os para o contexto de código legado, usaremos LLMs (mostradas, no artigo, como a alternativa mais eficiente de APR), o que permitirá avaliar como as técnicas de APR se comportam em cenários mais complexos e práticos. Além disso, o projeto integrará o uso de Large Language Models (LLMs) para gerar, de forma automatizada, critérios de aceitação baseados nas especificações e erros identificados no código. Essa abordagem visa não apenas orientar o processo de reparo automático, mas também fornecer um conjunto de requisitos de teste robustos que facilitem a validação das correções aplicadas.
+Para isso, adaptando os experimentos originais para o contexto de código legado, usaremos LLMs como ferramentas de APR (mostradas, no artigo, como a alternativa mais eficiente de APR), o que permitirá avaliar como essas técnicas se comportam em cenários mais complexos e práticos. Além disso, o projeto integrará o uso de Large Language Models (LLMs) para gerar, de forma automatizada, critérios de aceitação baseados nas especificações e erros identificados no código. Essa abordagem visa não apenas orientar o processo de reparo automático, mas também fornecer um conjunto de requisitos de teste robustos que facilitem a validação das correções aplicadas.
 
-Outro ponto importante que será explorados inclui uma pipeline iterativa de reparo: a ideia é implementar um ciclo contínuo no qual a LLM gere inicialmente os critérios de aceitação e/ou sugestões de patch, modernize o sistema com base nos critérios gerados e quaisquer erros encontrados no novo código sejam realimentados para a LLM. Essa abordagem iterativa permite a evolução gradual do código, aprimorando tanto a funcionalidade quanto a legibilidade e manutenibilidade.
+Outro ponto importante que será é uma pipeline iterativa de reparo: a ideia é implementar um ciclo contínuo no qual a LLM gere inicialmente os critérios de aceitação e/ou sugestões de patch, modernize o sistema com base nos critérios gerados e quaisquer erros encontrados no novo código sejam realimentados para a LLM. Essa abordagem iterativa permite a evolução gradual do código, aprimorando tanto a funcionalidade quanto a legibilidade e manutenibilidade.
 
 # Organização de pastas
 
-- Formatted code: o código do sistema no formato enviado para a LLM; aquivos de compilação, configuração de IDE, e arquivos vazios, por exemplo, foram ignorados.
-- Pastas separadas por modelo: organizar logs de conversas para testes e geração de código, segmentados em testes com descrições em linguagem natural.
+- **Formatted code**: o código do sistema no formato enviado para a LLM; aquivos de compilação, configuração de IDE, e arquivos vazios, por exemplo, foram ignorados.
+- **Pastas separadas por modelo**: organizar logs de conversas para testes e geração de código, segmentados em testes com descrições em linguagem natural.
 
 # Motivação
 
-A modernização de sistemas legados são um _wicked problem__, um desafio de difícil especificação que possui um número ilimitado de estratégias de solução, tornando-se um problema persistente dentro da engenharia de software [1]. Sistemas legados estão presentes em muitas indústrias, a exemplo de instituições governamentais nos Estados Unidos, que possui sistemas legados que foram escritos até mesmo 60 anos atrás. Esses sistemas desatualizados podem causar sérios riscos à eficiência, segurança, e manutenção de código dessas instituições.
- 
-Traditional approaches often rely on rule-based refactoring, static pattern matching, or complete system rewrites, all of which are costly, labor-intensive, and prone to introducing regressions. Moreover, developers and decision-makers remain cautious about fully integrating automation into modernization workflows, particularly for safety-critical systems where even minor unintended changes can introduce significant risks.
+A modernização de sistemas legados são um _wicked problem_, um desafio de difícil especificação que possui um número ilimitado de estratégias de solução, tornando-se um problema persistente dentro da engenharia de software [1]. Sistemas legados estão presentes em muitas indústrias, a exemplo de instituições governamentais nos Estados Unidos, que possui sistemas legados que foram escritos até mesmo 60 anos atrás. Esses sistemas desatualizados podem causar sérios riscos à eficiência, segurança, e manutenção de código dessas instituições. Utilizando LLMs para modernização, no lugar das estatégias tradicionais, a reescrita manual do sistemas e refatoramento complexo baseado pode ser evitado, reduzindo custos e esforço de trabalho.
 
-Large Language Models (LLMs) offer a promising new approach by not only assisting in code transformation but also in the generation of acceptance criteria—a crucial aspect of ensuring correctness. By leveraging LLMs to infer specifications from existing code, logs, or partial documentation, we can create robust test suites that serve as a foundation for both validation and automated repair. In turn, this enables a more structured, iterative modernization process that enhances reliability while reducing manual effort. Thus, this project explores the intersection of Automated Program Repair (APR) and LLM-generated acceptance criteria.
+Visto que sistemas críticos respondem para quaisquer alterações, ainda que pequenas, também utilizamos a LLM para a geração de critérios de aceitação, permitindo que a LLM consiga inferir especificações não só do conjunto de código existente, aumentando a confiabilidade do código gerado. Assim, o projeto explora a interseção de técnicas de APR e do uso de LLMs para geração de critérios de aceitação. 
 
 # Study Setting
-Given the complexity and heterogeneity of real-world legacy systems, our experimental setup was designed to balance practical relevance with controlled evaluation. To this end, we selected a set of representative legacy projects written in older versions of Java, where shared coding patterns and constraints provide a realistic testbed for assessing automated repair techniques guided by LLM-generated acceptance criteria.
-
-## Legacy Projects Selection
-
-To simulate real-world conditions, we chose two projects from different application domains and with varying levels of complexity:
+Dada a complexidade de sistemas legados do mundo real, escolhemos projetos representativos desses sistemas, buscando equilibrar sua complexidade com nossa capacidade avaliá-los por completo. Ainda que não possuam complexidade comparável a sistemas coorporativos, dificuldades como documentação e implementação técnica desatualizada, e um certo nível de interdependência entre diferentes partes do códigos, são comuns a ambas as classes de sistema, permitindo que conclusões obtidas possam ser generalizadas para cenários reais. Esses projetos foram escritos em versões mais antigas da linguagem Java.
 
 ### Hipparcos-plot
-A series of the European Spacial Agence tools written originally in 1997 and revisited, later, 9 years ago. The plot module of the tools were chosen to be modernized: it is responsible for generating graphs based on input data and it implements POO concepts.
-### F-sharp
-A music library management application that integrates with a native MySQL database. Written 16 years ago, this project exemplifies the challenges of legacy systems in managing database connections and adapting to new user requirements.
+Uma série de ferramenta da Agência Espacial Europeia escritas originalmente em 1997 e revisitadas 9 anos atrás. Seu módulo **Plot**, responsável pela geração de gráficos baseados em dados de entradas, foi escolhido para a modernização. Implementa também alguns conceitos de programação orientada a objeto.
 
-The choice of these projects is based on the premise that, even if they represent lower complexity compared to large-scale corporate systems, the inherent difficulties of legacy systems—such as outdated documentation, technical debt, and tightly coupled code—are pervasive and can be effectively exploited to validate the proposed techniques. Although the chosen projects have reduced complexity compared to large-scale legacy systems, their origin as legacy systems written in older Java versions offers a controlled yet realistic environment. The similarities among these systems (e.g., coding patterns, architectural constraints) allow us to extrapolate findings to more complex legacy scenarios.
+### F-sharp
+Um gerenciador de biblioteca musical integrado a um banco de dados MySQL. Escrito 16 anos atrás, esse projeto exemplicica como sistemas legados gerenciam conexões com base de dados e se adaptam para novos requisitos.
 
 ## Research Questions
 
-Our study is driven by the following core questions:
+Buscamos responder as seguintes questões:
 
 ### RQ1
-How effective are LLMs at generating acceptance criteria for code repair?
+Quão efetivas são LLMs na geração de critérios de aceitação para reparo de código?
 We assess the ability of LLMs to synthesize robust test cases and criteria that validate whether an automated repair maintains the intended behavior of legacy code.
 ### RQ2
-How well do the APR capabilities of LLMs work on legacy code?
-This question evaluates how well LLM-guided APR methods can handle the nuances of legacy systems, especially in the presence of convoluted logic and outdated coding practices.
+Quão bem as técnicas de APR baseadas em LLMs funcionam em código legado?
 ### RQ3
-How do the tests affect the repair process?
-We investigate whether the presence of LLM-generated test suites improves repair outcomes compared to traditional prompt engineering techniques, analyzing if additional test cases guide the LLM to generate more accurate and reliable patches.
+Como o uso ou não uso dos testes dentro do prompt afetam o processo de reparo?
 
 ## LLM Models and Experimental Setup
 
-For the automated generation of acceptance criteria and repair suggestions, we selected three state-of-the-art LLMs, each with distinct strengths in reasoning and code synthesis:
+Para a condução dos experimentos, usamos três LLMs, cada uma delas classificadas como _reasoning models_, capazes de atuar em tarefas complexas como solução de problemas matemáticos e geração de código. Os parâmetros padrão de cada modelo foram utilizados.
 
-### GPT-3-o (Model 1)
-Chosen for its advanced language understanding and coding capabilities, serving as a baseline for reasoning-intensive tasks.
-### Deepseek R1 (Model 2)
-Selected for its focus on code synthesis, this model is evaluated for its ability to identify patterns and suggest repairs in complex legacy code contexts.
-### Gemini Flash Thinking (Model 3)
-A model emphasizing both reasoning and code generation.
-
-All of the above models were used with the default parameters.
+- GPT-3o-mini (Modelo 1)
+- Deepseek R1 (Modelo 2)
+- Gemini Flash Thinking (Modelo 3)
 
 # Methodology
-Our methodology is designed to integrate LLM-generated acceptance criteria with an iterative automated repair process for legacy systems. The approach is structured into distinct phases: generation of acceptance criteria, utilization of LLMs for repair, and iterative validation and refinement of the generated patches.
+Nossa metodologia integra os critérios de aceitação com um processo iterativo de reparo automático de sistemas legado. Os experimentos podem ser divididos nas fases: geração de critério de aceitação, criação de LLMs para reparo, validação dos códigos gerados e refinimamento iterativo.
 
 ## Generation of Acceptance Criteria
 
-We generate two types of acceptance criteria for each legacy system:
+Dois tipos de critério de aceitação são gerados:
 
 ### Natural Language Descriptions
-The LLM is prompted to analyze the provided code—taking into account its purpose, inputs, and expected outputs—and generate a detailed narrative describing all necessary scenarios that verify the code’s correct behavior. This narrative acts as a set of acceptance criteria covering edge cases, functional requirements, and potential failure modes. The prompt for this task is:
-"Analyze the code below, including its purpose, inputs, and expected outputs. Then, generate a detailed natural language description of all the necessary scenarios that verify whether the code functions correctly and meets its intended requirements. Consider that the code will be transformed for the Java 17 language."
+A LLM é instruída a analisar o código fornecido, levando em consideração seu propósito, entradas e saídas esperadas, e gerar uma narrativa detalhada descrevendo todos os cenários necessários para verificar o comportamento correto do código. Essa narrativa atua como um conjunto de critérios de aceitação, e são inseridos no processo de modernização. O prompt para esta tarefa é: "Analyze the code below, including its purpose, inputs, and expected outputs. Then, generate a detailed natural language description of all the necessary scenarios that verify whether the code functions correctly and meets its intended requirements. Consider that the code will be transformed for the Java 17 language."
 
 ### Traditional Unit and Integration Tests:
-The LLM is also tasked with creating comprehensive test suites. The prompt for this task is:
+De maneira análoga ao processo com linguagem natural, a LLM é instruída a gerar um conjunto de testes programáticos com o seguinte prompt:
 "Analyze the code below, including its purpose, inputs, and expected outputs. Then, create a comprehensive test suite consisting of unit and/or integration tests that fully cover all aspects of the code's functionality, ensuring it produces a valid solution. Consider that the code will be transformed for the Java 17 language."
 
 ## LLM-Based Automated Repair Approaches
 
-Once the acceptance criteria are generated, they are used to guide the repair process. We test several approaches to determine the most effective strategy:
+Uma vez que os critérios de aceitação são gerados, eles são usados para orientar o processo de correção. Testamos as seguintes abodagens:
 
 ### Test Suite Only Approach
-The prompt includes only the generated test suites. This tests the LLM's ability to repair code based solely on dynamic behavioral specifications.
-### Natural Language Description Only Approach
-Only the natural language acceptance criteria are provided. This examines whether descriptive requirements can sufficiently guide the repair process without explicit test cases.
-### Baseline Modernization Prompt
-As a control, the LLM is given a simpler prompt such as "Modernize the code to Java version 17" without any additional acceptance criteria. This approach serves to benchmark the effectiveness of acceptance criteria in driving correct repairs.
+O prompt inclui apenas os conjuntos de testes gerados e o código legado, enviados de maneira sequencial. Isso avalia a capacidade do LLM de corrigir o código com base exclusivamente em especificações programáticas de comportamento.
 
-For each legacy system file, the chosen LLMs (GPT-3-o, Deepseek R1, and Gemini Flash Thinking) are engaged with these various prompts, ensuring that the repair process is evaluated across different input strategies.
+### Natural Language Description Only Approach
+Apenas os critérios de aceitação em linguagem natural são fornecidos. Isso examina se requisitos descritivos podem guiar efetivamento o processo de correção sem casos de teste explícitos.
+
+### Baseline Modernization Prompt
+Um prompt simples é enviado sem nenhum critério de aceitação adicional: "Modernize the code to Java version 17". Essa abordagem serve para medir a eficácia dos critérios de aceitação na condução de correções precisas.
+
+Para cada arquivo do sistema legado, os LLMs escolhidos (GPT-3o-mini, Deepseek R1 e Gemini Flash Thinking) são envolvidos com esses diferentes prompts, garantindo que o processo de correção seja avaliado em diversas estratégias de entrada.
 
 ## Iterative Repair and Validation Process
 
-The repair process is executed in an iterative cycle that comprises the following steps:
+O processo de correção é executado em um ciclo iterativo que compreende as seguintes etapas:
 
-### Candidate Generation:
-Based on the provided prompt and acceptance criteria, the LLM generates a modernized version of the legacy code.
+### Modernization Candidate Generation:
+Com base no prompt fornecido e nos critérios de aceitação, o LLM gera uma versão modernizada do código legado.
 
 ###  Testing and Validation:
-An attempt is made to compile and execute the code.
+É feita uma tentativa de compilar e executar o código.
 
 ### Feedback and Refinement:
-In cases where a candidate patch fails to be executed, error messages and test failures are fed back into the LLM. A new candidate is generated and testing is repeated.
+Nos casos em que um patch candidato falha na execução, mensagens de erro e falhas nos testes são retornadas ao LLM. Um novo candidato é gerado e o teste é repetido.
 
 ## Evaluation Metrics and Reproducibility
 
-To measure the effectiveness of our methodology, we consider multiple evaluation dimensions:
+Para medir a eficácia da nossa metodologia, consideramos:
 
 ### Acceptance Criteria Quality
-Evaluated by the comprehensiveness of the generated test suites and natural language descriptions, including coverage of edge cases and functional requirements.
+Avaliado pela abrangência dos conjuntos de testes gerados e das descrições em linguagem natural, em comparação aos testes pensados por nós, além da adição de testes e sua cobertura de casos extremos.
 
 ### Modernization Quality
-Evaluated by the easiness of integration, success/failure after compilation, and correct execution.
+Avaliado pela facilidade de integração, sucesso/fracasso após a compilação e execução correta.
 
-All prompts, test suites, and candidate patches are systematically organized in a dedicated directory structure (e.g., the “gemini” folder for conversation logs and test generation) to ensure full reproducibility and traceability of the experiments.For a more comprehensive read of our analysis, refer to the slidesheet presentation.
-
+Todos os prompts, conjuntos de testes, e códigos modernizados são organizados dentro do repositório com pastas dedicadas (por exemplo, a pasta "gemini" para registros de conversas e geração de testes) para garantir total reprodutibilidade dos experimentos. Para uma leitura mais abrangente de nossa análise, consulte a apresentação em slides.
 
