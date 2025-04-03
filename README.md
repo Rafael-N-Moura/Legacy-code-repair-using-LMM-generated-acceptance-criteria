@@ -10,6 +10,17 @@ Outro ponto importante que será é uma pipeline iterativa de reparo: a ideia é
 
 - **Formatted code**: o código do sistema no formato enviado para a LLM; aquivos de compilação, configuração de IDE, e arquivos vazios, por exemplo, foram ignorados.
 - **Pastas separadas por modelo**: organizar logs de conversas para testes e geração de código, segmentados em testes com descrições em linguagem natural.
+- **Arquivos JAR**: arquivos para execução dos códigos modernizados.
+
+Observação: Para execução dos arquivos JAR do projeto F-sharp é necessário possuir um servidor MySQL instalado, com usuário root e senha phokui. Crie também uma base de dados "music" com uma tabela "main". Sua estrura é a seguinte:
+
+CREATE TABLE main (
+    file_name VARCHAR(255) PRIMARY KEY,
+    track VARCHAR(255),
+    album VARCHAR(255),
+    artist VARCHAR(255)
+);
+
 
 # Motivação
 
