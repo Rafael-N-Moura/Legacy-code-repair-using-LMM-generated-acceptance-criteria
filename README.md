@@ -32,7 +32,6 @@ Buscamos responder as seguintes questões:
 
 ### RQ1
 Quão efetivas são LLMs na geração de critérios de aceitação para reparo de código?
-We assess the ability of LLMs to synthesize robust test cases and criteria that validate whether an automated repair maintains the intended behavior of legacy code.
 ### RQ2
 Quão bem as técnicas de APR baseadas em LLMs funcionam em código legado?
 ### RQ3
